@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  # PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    container_name: mychatgpt-postgres
+    environment:
+      POSTGRES_DB: mychatgpt
+      POSTGRES_USER: mychatgpt
+      POSTGRES_PASSWORD: mychatgpt
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mychatgpt"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ChromaDB (Vector DB)
+  chromadb:
+    image: chromadb/chroma:0.4.22
+    container_name: mychatgpt-chromadb
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      ANONYMIZED_TELEMETRY: "false"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Spring Boot App
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mychatgpt-app
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: mychatgpt
+      DB_USERNAME: mychatgpt
+      DB_PASSWORD: mychatgpt
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: 8000
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-sk-placeholder}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+    volumes:
+      - upload_data:/app/uploads
+
+volumes:
+  postgres_data:
+  chroma_data:
+  upload_data:
