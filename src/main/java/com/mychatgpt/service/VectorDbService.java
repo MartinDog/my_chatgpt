@@ -1,6 +1,6 @@
 package com.mychatgpt.service;
 
-import com.mychatgpt.ai.OpenAiClient;
+import com.mychatgpt.ai.EmbeddingService;
 import com.mychatgpt.vectordb.ChromaDbClient;
 import com.mychatgpt.vectordb.VectorSearchResult;
 import lombok.RequiredArgsConstructor;
@@ -20,14 +20,14 @@ import java.util.UUID;
 public class VectorDbService {
 
     private final ChromaDbClient chromaDbClient;
-    private final OpenAiClient openAiClient;
+    private final EmbeddingService embeddingService;
 
     /**
      * Store a document in the vector DB.
      */
     public String storeDocument(String content, String userId, String source, Map<String, String> extraMetadata) {
         String docId = UUID.randomUUID().toString();
-        float[] embedding = openAiClient.getEmbedding(content);
+        float[] embedding = embeddingService.getEmbedding(content);
 
         Map<String, String> metadata = new HashMap<>();
         metadata.put("userId", userId);
@@ -52,7 +52,7 @@ public class VectorDbService {
      */
     public void storeConversation(String sessionId, String userId, String role, String content) {
         String docId = "conv_" + UUID.randomUUID().toString();
-        float[] embedding = openAiClient.getEmbedding(content);
+        float[] embedding = embeddingService.getEmbedding(content);
 
         Map<String, String> metadata = Map.of(
                 "userId", userId,
@@ -73,7 +73,7 @@ public class VectorDbService {
      * Search for relevant context from the vector DB (user's personal data only).
      */
     public List<VectorSearchResult> searchRelevantContext(String query, String userId, int nResults) {
-        float[] queryEmbedding = openAiClient.getEmbedding(query);
+        float[] queryEmbedding = embeddingService.getEmbedding(query);
         Map<String, String> filter = Map.of("userId", userId);
         return chromaDbClient.query(queryEmbedding, nResults, filter);
     }
@@ -88,7 +88,7 @@ public class VectorDbService {
      * @return 검색 결과 리스트
      */
     public List<VectorSearchResult> searchKnowledgeBase(String query, int nResults, String source) {
-        float[] queryEmbedding = openAiClient.getEmbedding(query);
+        float[] queryEmbedding = embeddingService.getEmbedding(query);
         Map<String, String> filter = source != null ? Map.of("source", source) : null;
         return chromaDbClient.query(queryEmbedding, nResults, filter);
     }
@@ -103,7 +103,7 @@ public class VectorDbService {
      * @return 통합 검색 결과 리스트
      */
     public List<VectorSearchResult> searchAllSources(String query, String userId, int nResults) {
-        float[] queryEmbedding = openAiClient.getEmbedding(query);
+        float[] queryEmbedding = embeddingService.getEmbedding(query);
         List<VectorSearchResult> allResults = new ArrayList<>();
 
         // 1. Search knowledge base (YouTrack + Confluence) - no userId filter

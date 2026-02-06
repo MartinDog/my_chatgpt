@@ -35,3 +35,8 @@ chromadb:
 # File upload
 file:
   upload-dir: ${FILE_UPLOAD_DIR:/app/uploads}
+
+# Local Embedding (DJL + Sentence Transformers)
+embedding:
+  model:
+    path: ${EMBEDDING_MODEL_PATH:}  # Optional: local model path, otherwise downloads from HuggingFace

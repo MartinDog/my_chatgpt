@@ -26,16 +26,26 @@ dependencies {
     implementation("org.postgresql:postgresql")
 
     // HTTP Client for OpenAI & ChromaDB
-    implementation("com.squareup.okhttp3:okhttp")
-    implementation("com.google.code.gson:gson")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.google.code.gson:gson:2.10.1")
     implementation("com.fasterxml.jackson.core:jackson-databind")
 
-    // Apache Tika - for file text extraction
-    implementation("org.apache.tika:tika-core")
-    implementation("org.apache.tika:tika-parsers-standard-package")
+    // DJL - Local Embedding (Sentence Transformers)
+    implementation(platform("ai.djl:bom:0.27.0"))
+    implementation("ai.djl:api")
+    implementation("ai.djl.huggingface:tokenizers")
+    implementation("ai.djl.pytorch:pytorch-engine")
+    runtimeOnly("ai.djl.pytorch:pytorch-native-auto")
 
-    implementation("org.apache.poi:poi-ooxml")
-    implementation("org.jsoup:jsoup")
+    // Apache Tika - for file text extraction
+    implementation("org.apache.tika:tika-core:2.9.1")
+    implementation("org.apache.tika:tika-parsers-standard-package:2.9.1")
+
+    // Apache POI - for xlsx structured parsing
+    implementation("org.apache.poi:poi-ooxml:5.2.5")
+
+    // Jsoup - for HTML parsing
+    implementation("org.jsoup:jsoup:1.17.2")
 
     // Lombok
     compileOnly("org.projectlombok:lombok")

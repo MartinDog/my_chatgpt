@@ -1,6 +1,6 @@
 package com.mychatgpt.service;
 
-import com.mychatgpt.ai.OpenAiClient;
+import com.mychatgpt.ai.EmbeddingService;
 import com.mychatgpt.dto.ConfluenceDocumentDto;
 import com.mychatgpt.dto.YouTrackIssueDto;
 import com.mychatgpt.vectordb.ChromaDbClient;
@@ -52,7 +52,7 @@ public class KnowledgeBaseService {
     private final YouTrackExcelParser excelParser;
     private final ConfluenceHtmlParser confluenceParser;
     private final ChromaDbClient chromaDbClient;
-    private final OpenAiClient openAiClient;
+    private final EmbeddingService embeddingService;
 
     /** ChromaDB에 한 번에 보내는 문서 수. 너무 크면 요청 크기 제한에 걸릴 수 있음 */
     private static final int BATCH_SIZE = 50;
@@ -109,7 +109,7 @@ public class KnowledgeBaseService {
      */
     public void upsertSingleIssue(YouTrackIssueDto issue) {
         String document = issue.toVectorDocument();
-        float[] embedding = openAiClient.getEmbedding(document);
+        float[] embedding = embeddingService.getEmbedding(document);
         Map<String, String> metadata = buildMetadata(issue);
 
         chromaDbClient.upsertDocuments(
@@ -143,7 +143,7 @@ public class KnowledgeBaseService {
                 continue;
             }
 
-            float[] embedding = openAiClient.getEmbedding(document);
+            float[] embedding = embeddingService.getEmbedding(document);
 
             ids.add(issue.getId());
             embeddings.add(embedding);
@@ -203,7 +203,7 @@ public class KnowledgeBaseService {
      * source="youtrack"으로 필터링하여 knowledge base 데이터만 대상으로 검색.
      */
     public List<VectorSearchResult> searchKnowledgeBase(String query, int nResults) {
-        float[] queryEmbedding = openAiClient.getEmbedding(query);
+        float[] queryEmbedding = embeddingService.getEmbedding(query);
         Map<String, String> filter = Map.of("source", SOURCE_YOUTRACK);
         return chromaDbClient.query(queryEmbedding, nResults, filter);
     }
@@ -271,7 +271,7 @@ public class KnowledgeBaseService {
      */
     public void upsertSingleConfluenceDocument(ConfluenceDocumentDto document) {
         String docText = document.toVectorDocument();
-        float[] embedding = openAiClient.getEmbedding(docText);
+        float[] embedding = embeddingService.getEmbedding(docText);
         Map<String, String> metadata = buildConfluenceMetadata(document);
 
         chromaDbClient.upsertDocuments(
@@ -301,7 +301,7 @@ public class KnowledgeBaseService {
                 continue;
             }
 
-            float[] embedding = openAiClient.getEmbedding(docText);
+            float[] embedding = embeddingService.getEmbedding(docText);
 
             ids.add(doc.getId());
             embeddings.add(embedding);
@@ -333,7 +333,7 @@ public class KnowledgeBaseService {
      * Confluence knowledge base에서 유사 문서를 검색한다.
      */
     public List<VectorSearchResult> searchConfluenceKnowledgeBase(String query, int nResults) {
-        float[] queryEmbedding = openAiClient.getEmbedding(query);
+        float[] queryEmbedding = embeddingService.getEmbedding(query);
         Map<String, String> filter = Map.of("source", SOURCE_CONFLUENCE);
         return chromaDbClient.query(queryEmbedding, nResults, filter);
     }
@@ -343,7 +343,7 @@ public class KnowledgeBaseService {
      * (YouTrack + Confluence 통합 검색)
      */
     public List<VectorSearchResult> searchAllKnowledgeBase(String query, int nResults) {
-        float[] queryEmbedding = openAiClient.getEmbedding(query);
+        float[] queryEmbedding = embeddingService.getEmbedding(query);
         // 필터 없이 전체 검색
         return chromaDbClient.query(queryEmbedding, nResults, null);
     }
