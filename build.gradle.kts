@@ -26,13 +26,16 @@ dependencies {
     implementation("org.postgresql:postgresql")
 
     // HTTP Client for OpenAI & ChromaDB
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.squareup.okhttp3:okhttp")
+    implementation("com.google.code.gson:gson")
     implementation("com.fasterxml.jackson.core:jackson-databind")
 
     // Apache Tika - for file text extraction
-    implementation("org.apache.tika:tika-core:2.9.1")
-    implementation("org.apache.tika:tika-parsers-standard-package:2.9.1")
+    implementation("org.apache.tika:tika-core")
+    implementation("org.apache.tika:tika-parsers-standard-package")
+
+    implementation("org.apache.poi:poi-ooxml")
+    implementation("org.jsoup:jsoup")
 
     // Lombok
     compileOnly("org.projectlombok:lombok")

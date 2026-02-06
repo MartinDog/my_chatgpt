@@ -12,15 +12,16 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class VectorSearchTool implements ChatTool {
 
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final int DEFAULT_MAX_RESULTS = 5;
+
     private final VectorDbService vectorDbService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     public ToolDefinition getDefinition() {
@@ -52,10 +53,10 @@ public class VectorSearchTool implements ChatTool {
     @Override
     public String execute(String argumentsJson) {
         try {
-            JsonNode args = objectMapper.readTree(argumentsJson);
+            JsonNode args = OBJECT_MAPPER.readTree(argumentsJson);
             String query = args.path("query").asText();
             String userId = args.path("userId").asText();
-            int maxResults = args.path("maxResults").asInt(5);
+            int maxResults = args.path("maxResults").asInt(DEFAULT_MAX_RESULTS);
 
             if (query.isBlank() || userId.isBlank()) {
                 return "오류: query와 userId는 필수 파라미터입니다.";

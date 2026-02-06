@@ -28,11 +28,23 @@ public class ChatService {
     private final ChatSessionService sessionService;
     private final VectorDbService vectorDbService;
 
+    private static final int MAX_HISTORY_MESSAGES = 20;
+    private static final int DEFAULT_SEARCH_RESULTS = 5;
+
     private static final String DEFAULT_SYSTEM_PROMPT = """
-            You are a helpful AI assistant. You answer questions based on provided context and conversation history.
-            If relevant context is provided from the knowledge base, use it to inform your answers.
-            Always be honest about what you know and don't know.
-            Respond in the same language as the user's message.
+            You are a helpful AI assistant with access to the company's Knowledge Base.
+
+            The Knowledge Base includes:
+            - YouTrack 이슈: 업무 요청, 버그 리포트, 개발 히스토리
+            - Confluence 문서: 기술 문서, 가이드, 업무 프로세스
+            - 이전 대화 내역: 사용자와의 과거 대화
+
+            When answering questions:
+            1. If relevant context is provided from the Knowledge Base, use it to inform your answers
+            2. When citing information, mention the source (YouTrack 이슈, Confluence 문서 등)
+            3. If you need more specific information, use the knowledge_base_search tool
+            4. Be honest about what you know and don't know
+            5. Respond in the same language as the user's message
             """;
 
     public ChatResponse chat(ChatRequest request) {
@@ -42,9 +54,9 @@ public class ChatService {
         // Load previous messages from DB
         List<ChatMessage> history = messageRepository.findBySessionIdOrderByCreatedAtAsc(request.getSessionId());
 
-        // Search relevant context from vector DB
-        List<VectorSearchResult> relevantDocs = vectorDbService.searchRelevantContext(
-                request.getMessage(), request.getUserId(), 5);
+        // Search relevant context from vector DB (includes knowledge base: YouTrack + Confluence)
+        List<VectorSearchResult> relevantDocs = vectorDbService.searchAllSources(
+                request.getMessage(), request.getUserId(), DEFAULT_SEARCH_RESULTS);
 
         // Get system prompt (custom or default)
         String systemPrompt = session.getSystemPrompt() != null && !session.getSystemPrompt().isBlank()
@@ -97,15 +109,22 @@ public class ChatService {
         if (!relevantDocs.isEmpty()) {
             systemContent.append("\n\n--- Relevant Context from Knowledge Base ---\n");
             for (VectorSearchResult doc : relevantDocs) {
-                systemContent.append("- ").append(doc.getDocument()).append("\n");
+                String source = doc.getMetadata() != null ? doc.getMetadata().get("source") : "unknown";
+                String sourceLabel = switch (source) {
+                    case "youtrack" -> "[YouTrack 이슈]";
+                    case "confluence" -> "[Confluence 문서]";
+                    case "conversation" -> "[이전 대화]";
+                    default -> "[문서]";
+                };
+                systemContent.append(sourceLabel).append(" ").append(doc.getDocument()).append("\n\n");
             }
             systemContent.append("--- End of Context ---\n");
         }
 
         messages.add(Map.of("role", "system", "content", systemContent.toString()));
 
-        // Add conversation history (last 20 messages to control token usage)
-        int start = Math.max(0, history.size() - 20);
+        // Add conversation history (last N messages to control token usage)
+        int start = Math.max(0, history.size() - MAX_HISTORY_MESSAGES);
         for (int i = start; i < history.size(); i++) {
             ChatMessage msg = history.get(i);
             messages.add(Map.of("role", msg.getRole(), "content", msg.getContent()));

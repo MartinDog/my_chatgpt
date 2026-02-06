@@ -188,6 +188,92 @@ public class ChromaDbClient {
     }
 
     /**
+     * Upsert documents - 같은 ID가 있으면 업데이트, 없으면 추가.
+     *
+     * 기존 addDocuments()와의 차이:
+     * - addDocuments() → ChromaDB /add 엔드포인트 사용 → 이미 존재하는 ID를 넣으면 에러 발생
+     * - upsertDocuments() → ChromaDB /upsert 엔드포인트 사용 → ID 존재 여부에 관계없이 항상 성공
+     *
+     * YouTrack 이슈처럼 ID가 고정된 데이터를 반복 업로드할 때는 upsert가 필수.
+     * add를 쓰면 매번 기존 데이터를 삭제 후 재등록해야 하지만,
+     * upsert는 한 번의 호출로 신규/기존 구분 없이 처리 가능.
+     */
+    public void upsertDocuments(List<String> ids, List<float[]> embeddings,
+                                List<String> documents, List<Map<String, String>> metadatas) {
+        ensureReady();
+        try {
+            ObjectNode body = objectMapper.createObjectNode();
+
+            ArrayNode idsArray = body.putArray("ids");
+            ids.forEach(idsArray::add);
+
+            ArrayNode embeddingsArray = body.putArray("embeddings");
+            for (float[] emb : embeddings) {
+                ArrayNode embArray = embeddingsArray.addArray();
+                for (float v : emb) {
+                    embArray.add(v);
+                }
+            }
+
+            ArrayNode docsArray = body.putArray("documents");
+            documents.forEach(docsArray::add);
+
+            if (metadatas != null) {
+                ArrayNode metaArray = body.putArray("metadatas");
+                for (Map<String, String> meta : metadatas) {
+                    ObjectNode metaNode = metaArray.addObject();
+                    meta.forEach(metaNode::put);
+                }
+            }
+
+            webClient.post()
+                    .uri(config.getBaseUrl() + "/api/v1/collections/" + collectionId + "/upsert")
+                    .header("Content-Type", "application/json")
+                    .bodyValue(body.toString())
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+
+        } catch (Exception e) {
+            log.error("Failed to upsert documents to ChromaDB", e);
+            throw new RuntimeException("VectorDB 문서 upsert 실패: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Get documents by IDs - 특정 ID의 문서가 이미 존재하는지 확인할 때 사용.
+     */
+    public List<String> getExistingIds(List<String> ids) {
+        ensureReady();
+        try {
+            ObjectNode body = objectMapper.createObjectNode();
+            ArrayNode idsArray = body.putArray("ids");
+            ids.forEach(idsArray::add);
+
+            String responseStr = webClient.post()
+                    .uri(config.getBaseUrl() + "/api/v1/collections/" + collectionId + "/get")
+                    .header("Content-Type", "application/json")
+                    .bodyValue(body.toString())
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+
+            JsonNode response = objectMapper.readTree(responseStr);
+            JsonNode idsNode = response.path("ids");
+            List<String> existingIds = new ArrayList<>();
+            if (idsNode.isArray()) {
+                for (JsonNode idNode : idsNode) {
+                    existingIds.add(idNode.asText());
+                }
+            }
+            return existingIds;
+        } catch (Exception e) {
+            log.error("ChromaDB get by IDs failed", e);
+            return new ArrayList<>();
+        }
+    }
+
+    /**
      * Delete documents by IDs.
      */
     public void deleteByIds(List<String> ids) {

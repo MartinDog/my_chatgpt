@@ -7,6 +7,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -26,7 +29,7 @@ public class VectorDbService {
         String docId = UUID.randomUUID().toString();
         float[] embedding = openAiClient.getEmbedding(content);
 
-        Map<String, String> metadata = new java.util.HashMap<>();
+        Map<String, String> metadata = new HashMap<>();
         metadata.put("userId", userId);
         metadata.put("source", source);
         if (extraMetadata != null) {
@@ -67,12 +70,65 @@ public class VectorDbService {
     }
 
     /**
-     * Search for relevant context from the vector DB.
+     * Search for relevant context from the vector DB (user's personal data only).
      */
     public List<VectorSearchResult> searchRelevantContext(String query, String userId, int nResults) {
         float[] queryEmbedding = openAiClient.getEmbedding(query);
         Map<String, String> filter = Map.of("userId", userId);
         return chromaDbClient.query(queryEmbedding, nResults, filter);
+    }
+
+    /**
+     * Search the knowledge base (YouTrack + Confluence) for relevant context.
+     * This searches documents stored via KnowledgeBaseService.
+     *
+     * @param query     검색 쿼리
+     * @param nResults  반환할 결과 수
+     * @param source    검색할 소스 ("youtrack", "confluence", or null for all)
+     * @return 검색 결과 리스트
+     */
+    public List<VectorSearchResult> searchKnowledgeBase(String query, int nResults, String source) {
+        float[] queryEmbedding = openAiClient.getEmbedding(query);
+        Map<String, String> filter = source != null ? Map.of("source", source) : null;
+        return chromaDbClient.query(queryEmbedding, nResults, filter);
+    }
+
+    /**
+     * Search all sources: user's data + knowledge base (YouTrack + Confluence).
+     * Combines results from multiple queries for comprehensive context.
+     *
+     * @param query     검색 쿼리
+     * @param userId    사용자 ID (사용자 개인 데이터 검색용)
+     * @param nResults  각 소스별 반환할 결과 수
+     * @return 통합 검색 결과 리스트
+     */
+    public List<VectorSearchResult> searchAllSources(String query, String userId, int nResults) {
+        float[] queryEmbedding = openAiClient.getEmbedding(query);
+        List<VectorSearchResult> allResults = new ArrayList<>();
+
+        // 1. Search knowledge base (YouTrack + Confluence) - no userId filter
+        List<VectorSearchResult> kbResults = chromaDbClient.query(queryEmbedding, nResults, null);
+        // Filter to only include youtrack and confluence sources
+        kbResults.stream()
+                .filter(r -> r.getMetadata() != null)
+                .filter(r -> {
+                    String src = r.getMetadata().get("source");
+                    return "youtrack".equals(src) || "confluence".equals(src);
+                })
+                .forEach(allResults::add);
+
+        // 2. Search user's personal data (userId filter)
+        if (userId != null && !userId.isBlank()) {
+            Map<String, String> userFilter = Map.of("userId", userId);
+            List<VectorSearchResult> userResults = chromaDbClient.query(queryEmbedding, nResults, userFilter);
+            allResults.addAll(userResults);
+        }
+
+        // Sort by distance (lower is better) and limit total results
+        return allResults.stream()
+                .sorted(Comparator.comparingDouble(VectorSearchResult::getDistance))
+                .limit(nResults * 2L)  // Return up to 2x nResults for comprehensive context
+                .toList();
     }
 
     /**
