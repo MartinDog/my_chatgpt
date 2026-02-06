@@ -13,7 +13,8 @@ My ChatGPT is a Spring Boot-based AI chatbot API server with RAG (Retrieval-Augm
 - **Build Tool:** Gradle (Kotlin DSL)
 - **Database:** PostgreSQL 16
 - **Vector DB:** ChromaDB 0.4.22
-- **AI API:** OpenAI (GPT-4o-mini, text-embedding-3-small)
+- **AI API:** OpenAI (GPT-4o-mini for chat)
+- **Embedding:** Local (DJL + Sentence Transformers - all-MiniLM-L6-v2, 384 dimensions)
 
 ## Build & Run Commands
 
@@ -39,7 +40,7 @@ docker compose up -d
 
 ```
 src/main/java/com/mychatgpt/
-├── ai/           # OpenAI client and response wrappers
+├── ai/           # AI clients (OpenAI, LocalEmbedding) and response wrappers
 ├── config/       # Spring configuration classes
 ├── controller/   # REST API endpoints
 ├── service/      # Business logic layer
@@ -73,12 +74,13 @@ src/main/java/com/mychatgpt/
 ## Environment Variables
 
 Required:
-- `OPENAI_API_KEY` - OpenAI API key
+- `OPENAI_API_KEY` - OpenAI API key (for chat only, embeddings are local)
 
 Optional (with defaults):
 - `DB_HOST` (localhost), `DB_PORT` (5432), `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`
 - `CHROMA_HOST` (localhost), `CHROMA_PORT` (8000), `CHROMA_COLLECTION`
 - `OPENAI_MODEL` (gpt-4o-mini)
+- `EMBEDDING_MODEL_PATH` - Optional local path for embedding model (downloads from HuggingFace if not set)
 
 ## Code Conventions
 
