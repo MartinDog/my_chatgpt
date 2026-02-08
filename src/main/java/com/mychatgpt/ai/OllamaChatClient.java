@@ -4,15 +4,15 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.mychatgpt.config.OpenAiConfig;
+import com.mychatgpt.config.OllamaConfig;
 import com.mychatgpt.tool.ToolDefinition;
 import com.mychatgpt.tool.ToolRegistry;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import java.util.ArrayList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -20,24 +20,31 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class OpenAiClient {
+public class OllamaChatClient {
 
-    private final OpenAiConfig config;
-    private final WebClient webClient;
+    private final OllamaConfig config;
     private final ToolRegistry toolRegistry;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private WebClient webClient;
+
+    @PostConstruct
+    public void init() {
+        this.webClient = WebClient.builder()
+                .baseUrl(config.getBaseUrl())
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(10 * 1024 * 1024))
+                .build();
+        log.info("Ollama 채팅 클라이언트 초기화 완료. 모델: {}, URL: {}", config.getChatModel(), config.getBaseUrl());
+    }
 
     /**
-     * Chat completion with tool support.
-     * Returns the full response JSON node.
+     * Chat completion with tool support via Ollama API.
      */
     public ChatCompletionResult chatCompletion(List<Map<String, String>> messages, boolean enableTools) {
         try {
             ObjectNode requestBody = buildRequest(messages, enableTools);
 
             String responseStr = webClient.post()
-                    .uri(config.getBaseUrl() + "/v1/chat/completions")
-                    .header("Authorization", "Bearer " + config.getApiKey())
+                    .uri("/api/chat")
                     .header("Content-Type", "application/json")
                     .bodyValue(requestBody.toString())
                     .retrieve()
@@ -45,8 +52,7 @@ public class OpenAiClient {
                     .block();
 
             JsonNode response = objectMapper.readTree(responseStr);
-            JsonNode choice = response.path("choices").get(0);
-            JsonNode message = choice.path("message");
+            JsonNode message = response.path("message");
 
             // Check if tool call is requested
             if (message.has("tool_calls") && !message.path("tool_calls").isEmpty()) {
@@ -57,49 +63,19 @@ public class OpenAiClient {
             return new ChatCompletionResult(content, false);
 
         } catch (Exception e) {
-            log.error("OpenAI API call failed", e);
+            log.error("Ollama API 호출 실패", e);
             throw new RuntimeException("AI 응답 생성에 실패했습니다: " + e.getMessage(), e);
-        }
-    }
-
-    /**
-     * Generate embedding for a text.
-     */
-    public float[] getEmbedding(String text) {
-        try {
-            ObjectNode requestBody = objectMapper.createObjectNode();
-            requestBody.put("model", "text-embedding-3-small");
-            requestBody.put("input", text);
-
-            String responseStr = webClient.post()
-                    .uri(config.getBaseUrl() + "/v1/embeddings")
-                    .header("Authorization", "Bearer " + config.getApiKey())
-                    .header("Content-Type", "application/json")
-                    .bodyValue(requestBody.toString())
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
-
-            JsonNode response = objectMapper.readTree(responseStr);
-            JsonNode embeddingNode = response.path("data").get(0).path("embedding");
-
-            float[] embedding = new float[embeddingNode.size()];
-            for (int i = 0; i < embeddingNode.size(); i++) {
-                embedding[i] = (float) embeddingNode.get(i).asDouble();
-            }
-            return embedding;
-
-        } catch (Exception e) {
-            log.error("Embedding generation failed", e);
-            throw new RuntimeException("임베딩 생성에 실패했습니다: " + e.getMessage(), e);
         }
     }
 
     private ObjectNode buildRequest(List<Map<String, String>> messages, boolean enableTools) {
         ObjectNode requestBody = objectMapper.createObjectNode();
-        requestBody.put("model", config.getModel());
-        requestBody.put("temperature", 0.7);
-        requestBody.put("max_tokens", 4096);
+        requestBody.put("model", config.getChatModel());
+        requestBody.put("stream", false);
+
+        ObjectNode options = requestBody.putObject("options");
+        options.put("temperature", 0.7);
+        options.put("num_predict", 4096);
 
         ArrayNode messagesArray = requestBody.putArray("messages");
         for (Map<String, String> msg : messages) {
@@ -130,17 +106,16 @@ public class OpenAiClient {
                                                   JsonNode assistantMessage,
                                                   boolean enableTools) {
         try {
-            // Add assistant message with tool_calls to the conversation
             List<Map<String, String>> updatedMessages = new ArrayList<>(originalMessages);
 
-            // We need to add the raw assistant message including tool_calls
-            // For simplicity, we'll execute tools and add results, then re-call
             JsonNode toolCalls = assistantMessage.path("tool_calls");
             StringBuilder toolResults = new StringBuilder();
 
             for (JsonNode toolCall : toolCalls) {
                 String functionName = toolCall.path("function").path("name").asText();
-                String arguments = toolCall.path("function").path("arguments").asText();
+                // Ollama returns arguments as JSON object, convert to string
+                JsonNode argumentsNode = toolCall.path("function").path("arguments");
+                String arguments = argumentsNode.isTextual() ? argumentsNode.asText() : argumentsNode.toString();
 
                 log.info("Executing tool: {} with args: {}", functionName, arguments);
 
@@ -158,8 +133,7 @@ public class OpenAiClient {
             ObjectNode requestBody = buildRequest(updatedMessages, false);
 
             String responseStr = webClient.post()
-                    .uri(config.getBaseUrl() + "/v1/chat/completions")
-                    .header("Authorization", "Bearer " + config.getApiKey())
+                    .uri("/api/chat")
                     .header("Content-Type", "application/json")
                     .bodyValue(requestBody.toString())
                     .retrieve()
@@ -167,11 +141,11 @@ public class OpenAiClient {
                     .block();
 
             JsonNode response = objectMapper.readTree(responseStr);
-            String content = response.path("choices").get(0).path("message").path("content").asText("");
+            String content = response.path("message").path("content").asText("");
             return new ChatCompletionResult(content, true);
 
         } catch (Exception e) {
-            log.error("Tool call handling failed", e);
+            log.error("도구 호출 처리 실패", e);
             throw new RuntimeException("도구 실행에 실패했습니다: " + e.getMessage(), e);
         }
     }

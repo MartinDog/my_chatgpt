@@ -64,13 +64,11 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/mychatgpt
       SPRING_DATASOURCE_USERNAME: mychatgpt
       SPRING_DATASOURCE_PASSWORD: mychatgpt
-      # Spring AI 설정 연동
-      SPRING_AI_OLLAMA_BASE_URL: http://ollama:11434
-      SPRING_AI_OLLAMA_CHAT_MODEL: qwen3:30b  # 채팅용
-      SPRING_AI_OLLAMA_EMBEDDING_MODEL: bge-m3 # 임베딩용
       CHROMA_HOST: chromadb
       CHROMA_PORT: 8000
       OLLAMA_HOST: ollama
+      OLLAMA_CHAT_MODEL: "qwen3:30b"
+      OLLAMA_EMBEDDING_MODEL: bge-m3
     depends_on:
       postgres:
         condition: service_healthy

@@ -10,7 +10,8 @@ import org.springframework.context.annotation.Configuration;
 public class OllamaConfig {
     private String host;
     private int port;
-    private String model;
+    private String chatModel;
+    private String embeddingModel;
 
     public String getBaseUrl() {
         return "http://" + host + ":" + port;

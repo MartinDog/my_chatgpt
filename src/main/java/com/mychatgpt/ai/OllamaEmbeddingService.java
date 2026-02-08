@@ -35,7 +35,7 @@ public class OllamaEmbeddingService implements EmbeddingService {
         this.webClient = WebClient.builder()
                 .baseUrl(ollamaConfig.getBaseUrl())
                 .build();
-        log.info("Ollama 임베딩 서비스 초기화 완료. 모델: {}, URL: {}", ollamaConfig.getModel(), ollamaConfig.getBaseUrl());
+        log.info("Ollama 임베딩 서비스 초기화 완료. 모델: {}, URL: {}", ollamaConfig.getEmbeddingModel(), ollamaConfig.getBaseUrl());
     }
 
     @Override
@@ -46,7 +46,7 @@ public class OllamaEmbeddingService implements EmbeddingService {
 
         try {
             Map<String, Object> request = Map.of(
-                    "model", ollamaConfig.getModel(),
+                    "model", ollamaConfig.getEmbeddingModel(),
                     "input", text
             );
 
@@ -84,6 +84,6 @@ public class OllamaEmbeddingService implements EmbeddingService {
 
     @Override
     public String getModelName() {
-        return ollamaConfig.getModel();
+        return ollamaConfig.getEmbeddingModel();
     }
 }

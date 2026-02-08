@@ -1,7 +1,7 @@
 package com.mychatgpt.service;
 
 import com.mychatgpt.ai.ChatCompletionResult;
-import com.mychatgpt.ai.OpenAiClient;
+import com.mychatgpt.ai.OllamaChatClient;
 import com.mychatgpt.dto.ChatRequest;
 import com.mychatgpt.dto.ChatResponse;
 import com.mychatgpt.entity.ChatMessage;
@@ -23,7 +23,7 @@ import java.util.Map;
 @Slf4j
 public class ChatService {
 
-    private final OpenAiClient openAiClient;
+    private final OllamaChatClient ollamaChatClient;
     private final ChatMessageRepository messageRepository;
     private final ChatSessionService sessionService;
     private final VectorDbService vectorDbService;
@@ -63,11 +63,11 @@ public class ChatService {
                 ? session.getSystemPrompt()
                 : DEFAULT_SYSTEM_PROMPT;
 
-        // Build messages for OpenAI
+        // Build messages for Ollama
         List<Map<String, String>> messages = buildMessages(history, relevantDocs, request.getMessage(), systemPrompt);
 
-        // Call OpenAI
-        ChatCompletionResult result = openAiClient.chatCompletion(messages, true);
+        // Call Ollama
+        ChatCompletionResult result = ollamaChatClient.chatCompletion(messages, true);
         String aiResponse = result.getContent();
 
         // Save user message
