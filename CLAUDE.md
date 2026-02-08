@@ -4,7 +4,7 @@ This file provides guidance for Claude Code when working with this codebase.
 
 ## Project Overview
 
-My ChatGPT is a Spring Boot-based AI chatbot API server with RAG (Retrieval-Augmented Generation) support. It provides conversational AI capabilities powered by OpenAI's GPT API with vector search via ChromaDB.
+My ChatGPT is a Spring Boot-based AI chatbot API server with RAG (Retrieval-Augmented Generation) support. It provides conversational AI capabilities powered by Ollama (qwen3:30b) with vector search via ChromaDB.
 
 ## Tech Stack
 
@@ -13,14 +13,14 @@ My ChatGPT is a Spring Boot-based AI chatbot API server with RAG (Retrieval-Augm
 - **Build Tool:** Gradle (Kotlin DSL)
 - **Database:** PostgreSQL 16
 - **Vector DB:** ChromaDB 0.4.22
-- **AI API:** OpenAI (GPT-4o-mini for chat)
+- **AI API:** Ollama (qwen3:30b for chat)
 - **Embedding:** Ollama (bge-m3, 1024 dimensions)
 
 ## Build & Run Commands
 
 ```bash
-# Run locally (requires PostgreSQL and ChromaDB running)
-export OPENAI_API_KEY=sk-your-api-key
+# Run locally (requires PostgreSQL, ChromaDB, and Ollama running)
+# ollama pull qwen3:30b && ollama pull bge-m3
 ./gradlew bootRun
 
 # Run with Docker (full stack)
@@ -40,7 +40,7 @@ docker compose up -d
 
 ```
 src/main/java/com/mychatgpt/
-├── ai/           # AI clients (OpenAI, OllamaEmbedding) and response wrappers
+├── ai/           # AI clients (OllamaChat, OllamaEmbedding) and response wrappers
 ├── config/       # Spring configuration classes
 ├── controller/   # REST API endpoints
 ├── service/      # Business logic layer
@@ -73,14 +73,10 @@ src/main/java/com/mychatgpt/
 
 ## Environment Variables
 
-Required:
-- `OPENAI_API_KEY` - OpenAI API key (for chat only)
-
 Optional (with defaults):
 - `DB_HOST` (localhost), `DB_PORT` (5432), `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`
 - `CHROMA_HOST` (localhost), `CHROMA_PORT` (8000), `CHROMA_COLLECTION`
-- `OPENAI_MODEL` (gpt-4o-mini)
-- `OLLAMA_HOST` (localhost), `OLLAMA_PORT` (11434), `OLLAMA_EMBEDDING_MODEL` (bge-m3)
+- `OLLAMA_HOST` (localhost), `OLLAMA_PORT` (11434), `OLLAMA_CHAT_MODEL` (qwen3:30b), `OLLAMA_EMBEDDING_MODEL` (bge-m3)
 
 ## Code Conventions
 
