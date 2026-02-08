@@ -30,13 +30,6 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("com.fasterxml.jackson.core:jackson-databind")
 
-    // DJL - Local Embedding (Sentence Transformers)
-    implementation(platform("ai.djl:bom:0.27.0"))
-    implementation("ai.djl:api")
-    implementation("ai.djl.huggingface:tokenizers")
-    implementation("ai.djl.pytorch:pytorch-engine")
-    runtimeOnly("ai.djl.pytorch:pytorch-native-auto")
-
     // Apache Tika - for file text extraction
     implementation("org.apache.tika:tika-core:2.9.1")
     implementation("org.apache.tika:tika-parsers-standard-package:2.9.1")

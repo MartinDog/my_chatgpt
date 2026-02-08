@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  # PostgreSQL
+  # 1. PostgreSQL (pgvector 지원 가능 버전)
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16  # pgvector가 사전 설치된 공식 이미지 추천
     container_name: mychatgpt-postgres
     environment:
       POSTGRES_DB: mychatgpt
@@ -19,7 +19,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # ChromaDB (Vector DB)
+  # 2. ChromaDB (Vector DB)
   chromadb:
     image: chromadb/chroma:0.4.22
     container_name: mychatgpt-chromadb
@@ -35,7 +35,24 @@ services:
       timeout: 5s
       retries: 5
 
-  # Spring Boot App
+  # 3. Ollama (GPU 가속 및 Qwen-30B 실행용)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: mychatgpt-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # NVIDIA GPU 사용을 위한 passthrough 설정
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # 4. Spring Boot App
   app:
     build:
       context: .
@@ -44,15 +61,16 @@ services:
     ports:
       - "8080:8080"
     environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: mychatgpt
-      DB_USERNAME: mychatgpt
-      DB_PASSWORD: mychatgpt
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/mychatgpt
+      SPRING_DATASOURCE_USERNAME: mychatgpt
+      SPRING_DATASOURCE_PASSWORD: mychatgpt
+      # Spring AI 설정 연동
+      SPRING_AI_OLLAMA_BASE_URL: http://ollama:11434
+      SPRING_AI_OLLAMA_CHAT_MODEL: qwen3:30b  # 채팅용
+      SPRING_AI_OLLAMA_EMBEDDING_MODEL: bge-m3 # 임베딩용
       CHROMA_HOST: chromadb
       CHROMA_PORT: 8000
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-sk-placeholder}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OLLAMA_HOST: ollama
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,4 +82,5 @@ services:
 volumes:
   postgres_data:
   chroma_data:
+  ollama_data:
   upload_data:

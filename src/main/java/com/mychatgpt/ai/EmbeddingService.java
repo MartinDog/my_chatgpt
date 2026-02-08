@@ -4,8 +4,7 @@ package com.mychatgpt.ai;
  * 텍스트를 벡터 임베딩으로 변환하는 서비스 인터페이스.
  *
  * 구현체:
- * - LocalEmbeddingService: 로컬 모델 사용 (DJL + Sentence Transformers)
- * - OpenAI embedding: OpenAiClient.getEmbedding() (deprecated)
+ * - OllamaEmbeddingService: Ollama REST API 사용 (bge-m3)
  */
 public interface EmbeddingService {
 

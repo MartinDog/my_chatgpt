@@ -36,7 +36,8 @@ chromadb:
 file:
   upload-dir: ${FILE_UPLOAD_DIR:/app/uploads}
 
-# Local Embedding (DJL + Sentence Transformers)
-embedding:
-  model:
-    path: ${EMBEDDING_MODEL_PATH:}  # Optional: local model path, otherwise downloads from HuggingFace
+# Ollama Embedding
+ollama:
+  host: ${OLLAMA_HOST:localhost}
+  port: ${OLLAMA_PORT:11434}
+  model: ${OLLAMA_EMBEDDING_MODEL:bge-m3}
