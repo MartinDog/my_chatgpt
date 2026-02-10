@@ -61,9 +61,11 @@ services:
     ports:
       - "8080:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/mychatgpt
-      SPRING_DATASOURCE_USERNAME: mychatgpt
-      SPRING_DATASOURCE_PASSWORD: mychatgpt
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: mychatgpt
+      DB_USERNAME: mychatgpt
+      DB_PASSWORD: mychatgpt
       CHROMA_HOST: chromadb
       CHROMA_PORT: 8000
       OLLAMA_HOST: ollama
