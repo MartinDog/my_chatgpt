@@ -26,12 +26,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && pip3 install --no-cache-dir chromadb==0.5.0 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /app/uploads /workspace/data/postgres /workspace/data/chroma /var/log \
-    && chown -R postgres:postgres /workspace/data/postgres
+RUN mkdir -p /app/uploads /workspace/pgdata /workspace/chromadata \
+    /var/run/postgresql /var/log \
+    && chown postgres:postgres /workspace/pgdata /var/run/postgresql
 
 COPY --from=builder /app/build/libs/*.jar app.jar
 COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+COPY java-wrapper.sh /app/java-wrapper.sh
+RUN chmod +x /app/entrypoint.sh /app/java-wrapper.sh
+
+# RunPod overrides ENTRYPOINT and runs 'java -jar app.jar' directly.
+# Swap 'java' binary with our wrapper so entrypoint.sh always runs first.
+RUN mv /opt/java/openjdk/bin/java /opt/java/openjdk/bin/java.real \
+    && cp /app/java-wrapper.sh /opt/java/openjdk/bin/java \
+    && chmod +x /opt/java/openjdk/bin/java
 
 EXPOSE 8080
 
