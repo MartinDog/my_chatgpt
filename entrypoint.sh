@@ -152,4 +152,5 @@ done
 echo "=========================================="
 echo "[entrypoint] All services started. Launching Spring Boot..."
 echo "=========================================="
+export OLLAMA_HOST="localhost"
 exec $(find_java) -jar /app/app.jar
