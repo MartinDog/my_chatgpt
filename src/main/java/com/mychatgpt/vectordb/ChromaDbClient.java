@@ -38,22 +38,13 @@ public class ChromaDbClient {
 
     /**
      * Ensure the collection exists, create if not.
+     * Uses get_or_create to handle both cases in a single request.
      */
     private void ensureCollection() {
         try {
-            // Try to get existing collection
-            String response = webClient.get()
-                    .uri(config.getBaseUrl() + "/api/v1/collections/" + config.getCollectionName())
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
-
-            JsonNode node = objectMapper.readTree(response);
-            collectionId = node.path("id").asText();
-        } catch (WebClientResponseException.NotFound e) {
-            // Create collection
             ObjectNode body = objectMapper.createObjectNode();
             body.put("name", config.getCollectionName());
+            body.put("get_or_create", true);
             body.putObject("metadata").put("hnsw:space", "cosine");
 
             String response = webClient.post()
@@ -64,13 +55,8 @@ public class ChromaDbClient {
                     .bodyToMono(String.class)
                     .block();
 
-            try {
-                JsonNode node = objectMapper.readTree(response);
-                collectionId = node.path("id").asText();
-                log.info("Created ChromaDB collection: {}", config.getCollectionName());
-            } catch (Exception ex) {
-                throw new RuntimeException("Failed to parse collection creation response", ex);
-            }
+            JsonNode node = objectMapper.readTree(response);
+            collectionId = node.path("id").asText();
         } catch (Exception e) {
             throw new RuntimeException("Failed to connect to ChromaDB: " + e.getMessage(), e);
         }
