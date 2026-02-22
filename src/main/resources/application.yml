@@ -2,6 +2,22 @@ server:
   port: 8080
 
 spring:
+  ai:
+    ollama:
+      base-url: http://${OLLAMA_HOST:localhost}:${OLLAMA_PORT:11434}
+      chat:
+        options:
+          model: ${OLLAMA_CHAT_MODEL:qwen3:30b}
+          temperature: 0.7
+          num-predict: 4096
+      embedding:
+        options:
+          model: ${OLLAMA_EMBEDDING_MODEL:bge-m3}
+    vectorstore:
+      chroma:
+        url: http://${CHROMA_HOST:localhost}:${CHROMA_PORT:8000}
+        collection-name: ${CHROMA_COLLECTION:mychatgpt}
+        initialize-schema: true
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:mychatgpt}
     username: ${DB_USERNAME:mychatgpt}
@@ -34,9 +50,3 @@ chromadb:
 file:
   upload-dir: ${FILE_UPLOAD_DIR:/app/uploads}
 
-# Ollama (Chat + Embedding)
-ollama:
-  host: ${OLLAMA_HOST:localhost}
-  port: ${OLLAMA_PORT:11434}
-  chat-model: ${OLLAMA_CHAT_MODEL:qwen3:30b}
-  embedding-model: ${OLLAMA_EMBEDDING_MODEL:bge-m3}

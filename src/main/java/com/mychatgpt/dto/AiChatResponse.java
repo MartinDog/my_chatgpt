@@ -7,8 +7,9 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class ChatResponse {
+public class AiChatResponse {
     private String sessionId;
     private String message;
     private String timestamp;
+    private int relevanceScore;
 }

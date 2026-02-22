@@ -1,7 +1,7 @@
 plugins {
     java
-    id("org.springframework.boot") version "3.2.1"
-    id("io.spring.dependency-management") version "1.1.4"
+    id("org.springframework.boot") version "3.3.5"
+    id("io.spring.dependency-management") version "1.1.6"
 }
 
 group = "com.mychatgpt"
@@ -15,12 +15,25 @@ repositories {
     mavenCentral()
 }
 
+extra["springAiVersion"] = "1.0.3"
+
+dependencyManagement {
+    imports {
+        mavenBom("org.springframework.ai:spring-ai-bom:${property("springAiVersion")}")
+    }
+}
+
 dependencies {
+    // Spring AI
+    implementation("org.springframework.ai:spring-ai-starter-model-ollama")
+    implementation("org.springframework.ai:spring-ai-advisors-vector-store")
+    implementation("org.springframework.ai:spring-ai-starter-vector-store-chroma")
+
     // Spring Boot
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-validation")
-    implementation("org.springframework.boot:spring-boot-starter-webflux") // for WebClient
+    implementation("org.springframework.boot:spring-boot-starter-webflux") // for WebClient (ChromaDbClient)
 
     // PostgreSQL
     implementation("org.postgresql:postgresql")
