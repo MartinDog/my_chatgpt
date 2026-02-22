@@ -63,10 +63,11 @@ fi
 
 # ---- 4. Start PostgreSQL ----
 echo "[entrypoint] Starting PostgreSQL..."
-su postgres -c "${PG_BIN}/pg_ctl start -D ${PG_DATA} -l /var/log/postgresql.log -w -t 30" 2>&1
+PG_LOG="${PG_DATA}/postgresql.log"
+su postgres -c "${PG_BIN}/pg_ctl start -D ${PG_DATA} -l ${PG_LOG} -w -t 30" 2>&1
 if [ $? -ne 0 ]; then
     echo "[entrypoint] ERROR: pg_ctl start failed. Log:"
-    cat /var/log/postgresql.log 2>/dev/null
+    cat "${PG_LOG}" 2>/dev/null
     echo "[entrypoint] Starting app without DB..."
     exec $(find_java) -jar /app/app.jar
 fi
@@ -100,7 +101,7 @@ echo "[entrypoint] Database setup complete"
 echo "[entrypoint] Starting ChromaDB..."
 mkdir -p /workspace/chromadata
 CHROMA_PORT="${CHROMA_PORT:-8000}"
-chroma run --host 0.0.0.0 --port "$CHROMA_PORT" --path /workspace/chromadata > /var/log/chromadb.log 2>&1 &
+chroma run --host 0.0.0.0 --port "$CHROMA_PORT" --path /workspace/chromadata > /workspace/chromadata/chromadb.log 2>&1 &
 
 for i in $(seq 1 30); do
     if curl -sf "http://localhost:${CHROMA_PORT}/api/v1/heartbeat" >/dev/null 2>&1; then
