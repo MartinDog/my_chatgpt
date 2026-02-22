@@ -104,7 +104,7 @@ CHROMA_PORT="${CHROMA_PORT:-8000}"
 chroma run --host 0.0.0.0 --port "$CHROMA_PORT" --path /workspace/chromadata > /workspace/chromadata/chromadb.log 2>&1 &
 
 for i in $(seq 1 60); do
-    if curl -sf "http://localhost:${CHROMA_PORT}/api/v1/heartbeat" >/dev/null 2>&1; then
+    if curl -sf "http://localhost:${CHROMA_PORT}/api/v2/heartbeat" >/dev/null 2>&1; then
         echo "[entrypoint] ChromaDB is ready!"
         break
     fi

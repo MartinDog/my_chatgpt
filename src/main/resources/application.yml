@@ -15,8 +15,12 @@ spring:
           model: ${OLLAMA_EMBEDDING_MODEL:bge-m3}
     vectorstore:
       chroma:
-        url: http://${CHROMA_HOST:localhost}:${CHROMA_PORT:8000}
+        client:
+          host: http://${CHROMA_HOST:localhost}
+          port: ${CHROMA_PORT:8000}
         collection-name: ${CHROMA_COLLECTION:mychatgpt}
+        tenant-name: default_tenant
+        database-name: default_database
         initialize-schema: true
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:mychatgpt}

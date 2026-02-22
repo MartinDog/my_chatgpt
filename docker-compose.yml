@@ -21,7 +21,7 @@ services:
 
   # 2. ChromaDB (Vector DB)
   chromadb:
-    image: chromadb/chroma:0.5.0
+    image: chromadb/chroma:0.6.3
     container_name: mychatgpt-chromadb
     ports:
       - "8000:8000"
@@ -30,7 +30,7 @@ services:
     environment:
       ANONYMIZED_TELEMETRY: "false"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v2/heartbeat"]
       interval: 10s
       timeout: 5s
       retries: 5
