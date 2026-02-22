@@ -46,6 +46,19 @@ public class ConfluenceHtmlParser {
     private static final int MIN_CONTENT_LENGTH = 50;
 
     /**
+     * HTML 문자열을 파싱하여 DTO로 변환한다.
+     * MultipartFile 업로드 시 사용.
+     *
+     * @param htmlContent HTML 문자열
+     * @param fileName    원본 파일명
+     * @return 파싱된 DTO, 또는 유효하지 않은 문서면 null
+     */
+    public ConfluenceDocumentDto parseHtmlContent(String htmlContent, String fileName) {
+        Document doc = Jsoup.parse(htmlContent);
+        return doParse(doc, fileName);
+    }
+
+    /**
      * 단일 HTML 파일을 파싱하여 DTO로 변환한다.
      *
      * @param file HTML 파일
@@ -53,8 +66,10 @@ public class ConfluenceHtmlParser {
      */
     public ConfluenceDocumentDto parse(File file) throws IOException {
         Document doc = Jsoup.parse(file, StandardCharsets.UTF_8.name());
-        String fileName = file.getName();
+        return doParse(doc, file.getName());
+    }
 
+    private ConfluenceDocumentDto doParse(Document doc, String fileName) {
         // ID 추출
         String id = extractId(fileName);
         if (id == null) {
@@ -77,7 +92,6 @@ public class ConfluenceHtmlParser {
         if (content == null || content.length() < MIN_CONTENT_LENGTH) {
             log.debug("콘텐츠가 너무 짧거나 없음 ({}자): {}",
                     content == null ? 0 : content.length(), fileName);
-            // 콘텐츠가 짧아도 제목/breadcrumb만으로 가치가 있을 수 있으므로 null 반환하지 않음
         }
 
         // 메타데이터 추출

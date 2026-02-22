@@ -153,6 +153,38 @@ public class KnowledgeBaseController {
     // ========== Confluence 문서 처리 ==========
 
     /**
+     * Confluence HTML 파일을 HTTP로 업로드하여 벡터DB에 저장한다.
+     *
+     * 서버 파일시스템에 접근할 수 없는 환경(원격 배포 등)에서
+     * 클라이언트가 직접 HTML 파일을 업로드하여 knowledge base에 저장할 때 사용.
+     *
+     * 사용 예시 (다건):
+     *   curl -X POST http://localhost:8080/api/knowledge-base/upload-html \
+     *        -F "files=@doc1.html" -F "files=@doc2.html"
+     *
+     * 쉘 스크립트로 디렉토리 일괄 업로드:
+     *   find /path/to/html -name "*.html" | xargs -I {} curl -X POST \
+     *        http://localhost:8080/api/knowledge-base/upload-html -F "files=@{}"
+     */
+    @PostMapping("/upload-html")
+    public ResponseEntity<Map<String, Object>> uploadConfluenceHtml(
+            @RequestParam("files") List<MultipartFile> files) {
+
+        if (files.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "파일이 없습니다."));
+        }
+
+        try {
+            Map<String, Object> result = knowledgeBaseService.ingestConfluenceHtmlFiles(files);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("Confluence HTML 업로드 처리 실패", e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "HTML 처리 중 오류 발생: " + e.getMessage()));
+        }
+    }
+
+    /**
      * 지정된 디렉토리에서 HTML 파일들을 읽어 벡터DB에 저장한다.
      *
      * Confluence에서 export된 HTML 파일들을 파싱하여 의미 있는 데이터만 추출하고

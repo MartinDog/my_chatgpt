@@ -211,6 +211,73 @@ public class KnowledgeBaseService {
     // ========== Confluence 문서 처리 ==========
 
     /**
+     * HTTP로 업로드된 HTML 파일들을 파싱하여 벡터DB에 일괄 upsert한다.
+     *
+     * @param files 업로드된 HTML MultipartFile 리스트
+     * @return 처리 결과 요약
+     */
+    public Map<String, Object> ingestConfluenceHtmlFiles(List<MultipartFile> files) throws IOException {
+        List<ConfluenceDocumentDto> documents = new ArrayList<>();
+        int skippedCount = 0;
+
+        for (MultipartFile file : files) {
+            String fileName = file.getOriginalFilename();
+            if (fileName == null || !fileName.toLowerCase().endsWith(".html") || fileName.equals("index.html")) {
+                skippedCount++;
+                continue;
+            }
+
+            try {
+                String htmlContent = new String(file.getBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                ConfluenceDocumentDto dto = confluenceParser.parseHtmlContent(htmlContent, fileName);
+                if (dto != null && confluenceParser.isValidForVectorDb(dto)) {
+                    documents.add(dto);
+                } else {
+                    skippedCount++;
+                }
+            } catch (Exception e) {
+                log.error("HTML 파일 파싱 실패: {}", fileName, e);
+                skippedCount++;
+            }
+        }
+
+        log.info("HTML 업로드 파싱 완료: {}개 유효, {}개 스킵", documents.size(), skippedCount);
+
+        int totalCount = documents.size();
+        int successCount = 0;
+        int failCount = 0;
+        List<String> failedIds = new ArrayList<>();
+
+        for (int i = 0; i < documents.size(); i += BATCH_SIZE) {
+            int end = Math.min(i + BATCH_SIZE, documents.size());
+            List<ConfluenceDocumentDto> batch = documents.subList(i, end);
+
+            try {
+                upsertConfluenceBatch(batch);
+                successCount += batch.size();
+                log.info("Confluence 업로드 배치 처리 완료: {}/{}", Math.min(i + BATCH_SIZE, totalCount), totalCount);
+            } catch (Exception e) {
+                log.error("Confluence 업로드 배치 처리 실패 (index {}-{}): {}", i, end - 1, e.getMessage());
+                failCount += batch.size();
+                batch.forEach(doc -> failedIds.add(doc.getId()));
+            }
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("totalFiles", files.size());
+        result.put("validDocuments", totalCount);
+        result.put("skipped", skippedCount);
+        result.put("successCount", successCount);
+        result.put("failCount", failCount);
+        if (!failedIds.isEmpty()) {
+            result.put("failedIds", failedIds);
+        }
+        result.put("message", String.format("Confluence HTML %d건 중 %d건 저장 완료", totalCount, successCount));
+
+        return result;
+    }
+
+    /**
      * 지정된 디렉토리에서 모든 HTML 파일을 파싱하여 벡터DB에 일괄 upsert한다.
      *
      * @param directoryPath HTML 파일들이 있는 디렉토리 경로
