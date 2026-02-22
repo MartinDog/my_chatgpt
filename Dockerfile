@@ -24,7 +24,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
     zstd \
-    && pip3 install --no-cache-dir chromadb==0.5.0 \
+    && pip3 install --no-cache-dir "numpy<2.0" chromadb==0.5.0 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Ollama
