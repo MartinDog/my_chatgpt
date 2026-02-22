@@ -23,10 +23,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-16-pgvector \
     python3 \
     python3-pip \
+    zstd \
     && pip3 install --no-cache-dir chromadb==0.5.0 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /app/uploads /workspace/pgdata /workspace/chromadata \
+# Install Ollama
+RUN curl -fsSL https://ollama.com/install.sh | sh
+
+RUN mkdir -p /app/uploads /workspace/pgdata /workspace/chromadata /workspace/ollama \
     /var/run/postgresql /var/log \
     && chown postgres:postgres /workspace/pgdata /var/run/postgresql
 

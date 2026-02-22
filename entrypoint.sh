@@ -103,18 +103,52 @@ mkdir -p /workspace/chromadata
 CHROMA_PORT="${CHROMA_PORT:-8000}"
 chroma run --host 0.0.0.0 --port "$CHROMA_PORT" --path /workspace/chromadata > /workspace/chromadata/chromadb.log 2>&1 &
 
-for i in $(seq 1 30); do
+for i in $(seq 1 60); do
     if curl -sf "http://localhost:${CHROMA_PORT}/api/v1/heartbeat" >/dev/null 2>&1; then
         echo "[entrypoint] ChromaDB is ready!"
         break
     fi
-    if [ "$i" -eq 30 ]; then
-        echo "[entrypoint] WARN: ChromaDB not ready after 30s, continuing anyway"
+    if [ "$i" -eq 60 ]; then
+        echo "[entrypoint] WARN: ChromaDB not ready after 60s, continuing anyway"
     fi
     sleep 1
 done
 
-# ---- 8. Start Spring Boot App ----
+# ---- 8. Start Ollama ----
+echo "[entrypoint] Starting Ollama..."
+export OLLAMA_MODELS="/workspace/ollama"
+export OLLAMA_HOST="0.0.0.0:11434"
+ollama serve > /var/log/ollama.log 2>&1 &
+
+echo "[entrypoint] Waiting for Ollama..."
+for i in $(seq 1 30); do
+    if curl -sf "http://localhost:11434/" >/dev/null 2>&1; then
+        echo "[entrypoint] Ollama is ready!"
+        break
+    fi
+    if [ "$i" -eq 30 ]; then
+        echo "[entrypoint] WARN: Ollama not ready after 30s, continuing anyway"
+    fi
+    sleep 1
+done
+
+# Pull models if not already present
+OLLAMA_MODELS_LIST="${OLLAMA_EMBEDDING_MODEL:-bge-m3} ${OLLAMA_CHAT_MODEL:-qwen3:30b}"
+for model in $OLLAMA_MODELS_LIST; do
+    if ollama list 2>/dev/null | grep -q "^${model}"; then
+        echo "[entrypoint] Model already exists: ${model}, skipping pull"
+    else
+        echo "[entrypoint] Pulling model: ${model} ... (this may take a while)"
+        ollama pull "$model" 2>&1
+        if [ $? -eq 0 ]; then
+            echo "[entrypoint] Model pulled successfully: ${model}"
+        else
+            echo "[entrypoint] WARN: Failed to pull model: ${model}"
+        fi
+    fi
+done
+
+# ---- 9. Start Spring Boot App ----
 echo "=========================================="
 echo "[entrypoint] All services started. Launching Spring Boot..."
 echo "=========================================="
