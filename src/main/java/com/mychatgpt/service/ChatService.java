@@ -70,14 +70,11 @@ public class ChatService {
 
         List<ChatMessage> history = messageRepository.findBySessionIdOrderByCreatedAtAsc(request.getSessionId());
 
-        List<VectorSearchResult> relevantDocs = vectorDbService.searchAllSources(
-                request.getMessage(), request.getUserId(), DEFAULT_SEARCH_RESULTS);
-
         String systemPrompt = session.getSystemPrompt() != null && !session.getSystemPrompt().isBlank()
                 ? session.getSystemPrompt()
                 : DEFAULT_SYSTEM_PROMPT;
 
-        List<Message> messages = buildMessages(history, relevantDocs, request.getMessage(), systemPrompt);
+        List<Message> messages = buildMessages(history, request.getMessage(), systemPrompt);
 
         AiChatResponse aiChatResponse =
                 chatClient.prompt(new Prompt(messages))
@@ -111,27 +108,11 @@ public class ChatService {
     }
 
     private List<Message> buildMessages(List<ChatMessage> history,
-                                         List<VectorSearchResult> relevantDocs,
                                          String userMessage,
                                          String systemPrompt) {
         List<Message> messages = new ArrayList<>();
 
         StringBuilder systemContent = new StringBuilder(systemPrompt);
-
-        if (!relevantDocs.isEmpty()) {
-            systemContent.append("\n\n--- Relevant Context from Knowledge Base ---\n");
-            for (VectorSearchResult doc : relevantDocs) {
-                String source = doc.getMetadata() != null ? doc.getMetadata().get("source") : "unknown";
-                String sourceLabel = switch (source) {
-                    case "youtrack" -> "[YouTrack 이슈]";
-                    case "confluence" -> "[Confluence 문서]";
-                    case "conversation" -> "[이전 대화]";
-                    default -> "[문서]";
-                };
-                systemContent.append(sourceLabel).append(" ").append(doc.getDocument()).append("\n\n");
-            }
-            systemContent.append("--- End of Context ---\n");
-        }
 
         messages.add(new SystemMessage(systemContent.toString()));
 
