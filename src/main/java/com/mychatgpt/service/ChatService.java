@@ -4,6 +4,7 @@ import com.mychatgpt.dto.ChatRequest;
 import com.mychatgpt.dto.AiChatResponse;
 import com.mychatgpt.entity.ChatMessage;
 import com.mychatgpt.entity.ChatSession;
+import com.mychatgpt.event.ConversationCompletedEvent;
 import com.mychatgpt.repository.ChatMessageRepository;
 import com.mychatgpt.vectordb.VectorSearchResult;
 import lombok.RequiredArgsConstructor;
@@ -14,14 +15,13 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -32,11 +32,11 @@ public class ChatService {
     private final ChatMessageRepository messageRepository;
     private final ChatSessionService sessionService;
     private final VectorDbService vectorDbService;
+    private final ApplicationEventPublisher eventPublisher;
 
     private static final int MAX_HISTORY_MESSAGES = 20;
     private static final int DEFAULT_SEARCH_RESULTS = 5;
     private static final int VECTOR_DB_STORE_THRESHOLD = 70;
-    private static final Pattern RELEVANCE_SCORE_PATTERN = Pattern.compile("<relevance_score>(\\d+)</relevance_score>");
 
     private static final String DEFAULT_SYSTEM_PROMPT = """
             You are a helpful AI assistant with access to the company's Knowledge Base.
@@ -83,30 +83,26 @@ public class ChatService {
                 chatClient.prompt(new Prompt(messages))
                         .call().entity(AiChatResponse.class);
 
-        log.info("Conversation relevance score: {} (threshold: {})", aiChatResponse.getRelevanceScore(), VECTOR_DB_STORE_THRESHOLD);
+        int relevanceScore = aiChatResponse.getRelevanceScore();
+        log.info("Conversation relevance score: {} (threshold: {})", relevanceScore, VECTOR_DB_STORE_THRESHOLD);
 
         saveMessage(request.getSessionId(), "user", request.getMessage());
         saveMessage(request.getSessionId(), "assistant", aiChatResponse.getMessage());
 
-        if (aiChatResponse.getRelevanceScore() >= VECTOR_DB_STORE_THRESHOLD) {
-            try {
-                vectorDbService.storeConversation(
-                        request.getSessionId(), request.getUserId(), "user", request.getMessage());
-                vectorDbService.storeConversation(
-                        request.getSessionId(), request.getUserId(), "assistant", aiChatResponse.getMessage());
-                log.info("Conversation stored in vector DB (score: {})", aiChatResponse.getRelevanceScore());
-            } catch (Exception e) {
-                log.warn("Failed to store conversation in vector DB: {}", e.getMessage());
-            }
+        if (relevanceScore >= VECTOR_DB_STORE_THRESHOLD) {
+            eventPublisher.publishEvent(new ConversationCompletedEvent(
+                    request.getSessionId(), request.getUserId(),
+                    request.getMessage(), aiChatResponse.getMessage()));
+            log.info("Conversation event published for async vector DB storage (score: {})", relevanceScore);
         } else {
-            log.info("Conversation skipped for vector DB storage (score: {} < {})", aiChatResponse.getRelevanceScore(), VECTOR_DB_STORE_THRESHOLD);
+            log.info("Conversation skipped for vector DB storage (score: {} < {})", relevanceScore, VECTOR_DB_STORE_THRESHOLD);
         }
 
         return new AiChatResponse(
                 request.getSessionId(),
                 aiChatResponse.getMessage(),
                 LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                aiChatResponse.getRelevanceScore()
+                relevanceScore
         );
     }
 

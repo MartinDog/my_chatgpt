@@ -5,6 +5,8 @@ import com.mychatgpt.vectordb.ChromaDbClient;
 import com.mychatgpt.vectordb.VectorSearchResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -25,6 +27,7 @@ public class VectorDbService {
     /**
      * Store a document in the vector DB.
      */
+    @CacheEvict(value = "vectorSearch", allEntries = true)
     public String storeDocument(String content, String userId, String source, Map<String, String> extraMetadata) {
         String docId = UUID.randomUUID().toString();
         float[] embedding = embeddingService.getEmbedding(content);
@@ -50,6 +53,7 @@ public class VectorDbService {
     /**
      * Store a conversation turn in the vector DB for context retrieval.
      */
+    @CacheEvict(value = "vectorSearch", allEntries = true)
     public void storeConversation(String sessionId, String userId, String role, String content) {
         String docId = "conv_" + UUID.randomUUID().toString();
         float[] embedding = embeddingService.getEmbedding(content);
@@ -102,6 +106,7 @@ public class VectorDbService {
      * @param nResults  각 소스별 반환할 결과 수
      * @return 통합 검색 결과 리스트
      */
+    @Cacheable(value = "vectorSearch", key = "#query + '_' + #userId + '_' + #nResults")
     public List<VectorSearchResult> searchAllSources(String query, String userId, int nResults) {
         float[] queryEmbedding = embeddingService.getEmbedding(query);
         List<VectorSearchResult> allResults = new ArrayList<>();
