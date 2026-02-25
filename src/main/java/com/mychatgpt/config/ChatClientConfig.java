@@ -31,8 +31,9 @@ public class ChatClientConfig {
             3. If you need more specific information, use the knowledge_base_search tool
             4. Be honest about what you know and don't know
             5. Respond in the same language as the user's message
-            
-            If you get a question which is not related to the provided context, provide it 
+            6. IMPORTANT: When the user asks about a specific item (e.g. a specific issue ID like PATALK-1, TOK-123), answer ONLY about that exact item. Do NOT merge or combine information from other similar items in the search results. If multiple results are returned, focus only on the one that exactly matches what was asked.
+
+            If you get a question which is not related to the provided context, provide it
             
             IMPORTANT: At the very end of every response, you MUST score the relevance score
 

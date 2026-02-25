@@ -17,6 +17,7 @@ import java.util.Map;
 public class KnowledgeBaseSearchTools {
 
     private static final int DEFAULT_MAX_RESULTS = 5;
+    private static final double SIMILARITY_THRESHOLD = 0.5;
 
     private final VectorDbService vectorDbService;
 
@@ -36,15 +37,15 @@ public class KnowledgeBaseSearchTools {
 
             List<VectorSearchResult> results = vectorDbService.searchKnowledgeBase(query, limit, source);
 
-            if (source == null) {
-                results = results.stream()
-                        .filter(r -> r.getMetadata() != null)
-                        .filter(r -> {
-                            String src = r.getMetadata().get("source");
-                            return "youtrack".equals(src) || "confluence".equals(src);
-                        })
-                        .toList();
-            }
+            results = results.stream()
+                    .filter(r -> (1.0 - r.getDistance()) >= SIMILARITY_THRESHOLD)
+                    .filter(r -> r.getMetadata() != null)
+                    .filter(r -> {
+                        if (source != null) return true;
+                        String src = r.getMetadata().get("source");
+                        return "youtrack".equals(src) || "confluence".equals(src);
+                    })
+                    .toList();
 
             if (results.isEmpty()) {
                 return "검색 결과가 없습니다. Knowledge Base에 관련 정보가 없습니다.";
