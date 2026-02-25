@@ -16,6 +16,7 @@ My ChatGPT is a Spring Boot-based AI chatbot API server with RAG (Retrieval-Augm
 - **Vector DB:** ChromaDB (via Spring AI `spring-ai-starter-vector-store-chroma`)
 - **AI Model:** Ollama (qwen3:30b for chat, bge-m3 for embedding - 1024 dimensions)
 - **Document Parsing:** Apache Tika, Apache POI (xlsx), Jsoup (HTML)
+- **Caching:** Caffeine (spring-boot-starter-cache + caffeine, `vectorSearch` cache, 10min TTL, max 500 entries)
 
 ## Build & Run Commands
 
@@ -46,6 +47,7 @@ src/main/java/com/mychatgpt/
 │   ├── EmbeddingService.java        #   Interface for embedding
 │   └── OllamaEmbeddingService.java  #   Ollama bge-m3 implementation (Spring AI EmbeddingModel)
 ├── config/                          # Spring configuration
+│   ├── CacheConfig.java             #   Caffeine cache manager (vectorSearch, 10min TTL)
 │   ├── ChatClientConfig.java        #   Spring AI ChatClient bean (tools + QuestionAnswerAdvisor)
 │   ├── ChromaDbConfig.java          #   ChromaDB connection config
 │   ├── GlobalExceptionHandler.java  #   Global exception handler
@@ -66,6 +68,9 @@ src/main/java/com/mychatgpt/
 │   ├── UserService.java             #   User CRUD
 │   ├── VectorDbService.java         #   General vector DB operations
 │   └── YouTrackExcelParser.java     #   XLSX parsing for YouTrack exports (Apache POI)
+├── event/                           # Spring application events
+│   ├── ConversationCompletedEvent.java #   Event fired after chat response
+│   └── ConversationEventListener.java  #   Async listener: stores conversation in vector DB
 ├── entity/                          # JPA entities
 │   ├── User.java
 │   ├── ChatSession.java
@@ -95,7 +100,9 @@ src/main/java/com/mychatgpt/
 - **Spring AI ChatClient:** Central `ChatClient` bean configured with tools and `QuestionAnswerAdvisor` for RAG
 - **Spring AI Tool System:** Tools use `@Tool` and `@ToolParam` annotations (registered via `ChatClient.defaultTools()`)
 - **Dual Vector DB Access:** Spring AI `VectorStore` for automatic RAG advisor + `ChromaDbClient` for custom operations (knowledge base, filtered search)
-- **Relevance Scoring:** AI responses include `<relevance_score>` tag; conversations scoring ≥70 are auto-stored in vector DB
+- **Relevance Scoring:** AI responses include `<relevance_score>` tag; conversations scoring ≥70 are auto-stored in vector DB via async `ConversationCompletedEvent`
+- **Event-Driven Storage:** `ConversationCompletedEvent` published after chat; `ConversationEventListener` handles async vector DB persistence
+- **Caching:** `CacheConfig` sets up Caffeine `vectorSearch` cache (10min TTL, max 500 entries)
 - **Batch Upsert:** Knowledge Base ingestion processes documents in batches of 50
 - **Lombok:** Uses `@Data`, `@Builder`, `@RequiredArgsConstructor`, `@Slf4j` throughout
 - **Configuration:** `application.yml` with environment variable overrides
