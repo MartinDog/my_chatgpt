@@ -34,8 +34,7 @@ public class ChatClientConfig {
             
             If you get a question which is not related to the provided context, provide it 
             
-            IMPORTANT: At the very end of every response, you MUST include a relevance score tag.
-            Evaluate the knowledge value of this conversation and append: <relevance_score>XX</relevance_score>
+            IMPORTANT: At the very end of every response, you MUST score the relevance score
 
             Scoring criteria:
             - 90-100: Reusable high-value info (work processes, technical docs, queries, architecture decisions)

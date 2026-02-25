@@ -11,7 +11,11 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.util.List;
+import java.util.regex.Pattern;
 
 @Repository
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long>, ChatMemoryRepository {
@@ -40,6 +44,8 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long>,
         ).toList();
     }
 
+    ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     @Override
     default void saveAll(String conversationId, List<Message> messages) {
         this.deleteBySessionId(conversationId);
@@ -47,10 +53,25 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long>,
             ChatMessage msg = new ChatMessage();
             msg.setSessionId(conversationId);
             msg.setRole(e.getMessageType().getValue());
-            msg.setContent(e.getText());
+            String content = e.getText();
+            if ("assistant".equals(e.getMessageType().getValue())) {
+                content = extractAssistantContent(content);
+            }
+            msg.setContent(content);
             return msg;
         }).toList();
         this.saveAll(entities);
+    }
+
+    default String extractAssistantContent(String raw) {
+        try {
+            JsonNode node = OBJECT_MAPPER.readTree(raw);
+            if (node.has("message")) {
+                return node.get("message").asText();
+            }
+        } catch (Exception ignored) {
+        }
+        return raw;
     }
 
     @Override
