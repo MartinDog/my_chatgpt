@@ -5,6 +5,7 @@ import com.mychatgpt.repository.ChatMessageRepository;
 import com.mychatgpt.repository.ChatSessionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -50,7 +51,7 @@ public class ChatSessionService {
         return sessionRepository.findByUserId(userId);
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRED)
     public void deleteSession(String sessionId) {
         messageRepository.deleteBySessionId(sessionId);
         sessionRepository.deleteBySessionId(sessionId);

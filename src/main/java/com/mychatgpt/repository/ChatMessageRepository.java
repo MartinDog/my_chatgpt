@@ -9,6 +9,7 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -16,6 +17,8 @@ import java.util.List;
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long>, ChatMemoryRepository {
 
     List<ChatMessage> findBySessionIdOrderByCreatedAtAsc(String sessionId);
+
+    @Transactional
     void deleteBySessionId(String sessionId);
 
     @Query("SELECT DISTINCT c.sessionId FROM ChatMessage c")
