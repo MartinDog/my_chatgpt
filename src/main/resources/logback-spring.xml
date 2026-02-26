@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <springProperty scope="context" name="LOG_DIR" source="logging.file.path" defaultValue="/app/logs"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/app.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!-- 날짜 + 인덱스 기반 롤링 파일명 -->
+            <fileNamePattern>${LOG_DIR}/app-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <!-- 개별 파일 최대 크기 -->
+            <maxFileSize>100MB</maxFileSize>
+            <!-- 전체 로그 총 크기 제한 500MB: 초과 시 오래된 파일 자동 삭제 -->
+            <totalSizeCap>500MB</totalSizeCap>
+            <!-- 최대 보관 기간 (totalSizeCap 초과 시 먼저 삭제) -->
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </root>
+</configuration>

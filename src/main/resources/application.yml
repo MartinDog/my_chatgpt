@@ -56,3 +56,8 @@ chromadb:
 file:
   upload-dir: ${FILE_UPLOAD_DIR:/app/uploads}
 
+# Logging
+logging:
+  file:
+    path: ${LOG_DIR:/app/logs}
+

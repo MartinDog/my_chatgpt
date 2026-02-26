@@ -77,9 +77,12 @@ public class VectorDbService {
      * Search for relevant context from the vector DB (user's personal data only).
      */
     public List<VectorSearchResult> searchRelevantContext(String query, String userId, int nResults) {
+        log.info("[VectorSearch] 개인 컨텍스트 검색: query='{}', userId={}, nResults={}", query, userId, nResults);
         float[] queryEmbedding = embeddingService.getEmbedding(query);
         Map<String, String> filter = Map.of("userId", userId);
-        return chromaDbClient.query(queryEmbedding, nResults, filter);
+        List<VectorSearchResult> results = chromaDbClient.query(queryEmbedding, nResults, filter);
+        logSearchResults(results);
+        return results;
     }
 
     /**
@@ -92,9 +95,12 @@ public class VectorDbService {
      * @return 검색 결과 리스트
      */
     public List<VectorSearchResult> searchKnowledgeBase(String query, int nResults, String source) {
+        log.info("[VectorSearch] 지식베이스 검색: query='{}', source={}, nResults={}", query, source, nResults);
         float[] queryEmbedding = embeddingService.getEmbedding(query);
         Map<String, String> filter = source != null ? Map.of("source", source) : null;
-        return chromaDbClient.query(queryEmbedding, nResults, filter);
+        List<VectorSearchResult> results = chromaDbClient.query(queryEmbedding, nResults, filter);
+        logSearchResults(results);
+        return results;
     }
 
     /**
@@ -108,6 +114,7 @@ public class VectorDbService {
      */
     @Cacheable(value = "vectorSearch", key = "#query + '_' + #userId + '_' + #nResults")
     public List<VectorSearchResult> searchAllSources(String query, String userId, int nResults) {
+        log.info("[VectorSearch] 전체 소스 검색: query='{}', userId={}, nResults={}", query, userId, nResults);
         float[] queryEmbedding = embeddingService.getEmbedding(query);
         List<VectorSearchResult> allResults = new ArrayList<>();
 
@@ -130,10 +137,14 @@ public class VectorDbService {
         }
 
         // Sort by distance (lower is better) and limit total results
-        return allResults.stream()
+        List<VectorSearchResult> finalResults = allResults.stream()
                 .sorted(Comparator.comparingDouble(VectorSearchResult::getDistance))
                 .limit(nResults * 2L)  // Return up to 2x nResults for comprehensive context
                 .toList();
+
+        log.info("[VectorSearch] 전체 소스 검색 완료: {}건 반환", finalResults.size());
+        logSearchResults(finalResults);
+        return finalResults;
     }
 
     /**
@@ -155,5 +166,21 @@ public class VectorDbService {
      */
     public void deleteSessionVectors(String sessionId) {
         chromaDbClient.deleteByFilter(Map.of("sessionId", sessionId));
+    }
+
+    private void logSearchResults(List<VectorSearchResult> results) {
+        if (results.isEmpty()) {
+            log.info("[VectorSearch] 결과 없음");
+            return;
+        }
+        for (int i = 0; i < results.size(); i++) {
+            VectorSearchResult r = results.get(i);
+            String source = r.getMetadata() != null ? r.getMetadata().getOrDefault("source", "-") : "-";
+            String docSnippet = r.getDocument() != null
+                    ? r.getDocument().substring(0, Math.min(80, r.getDocument().length())).replace("\n", " ")
+                    : "";
+            log.info("[VectorSearch] [{}] distance={} source={} doc='{}'",
+                    i + 1, String.format("%.4f", r.getDistance()), source, docSnippet);
+        }
     }
 }

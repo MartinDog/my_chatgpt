@@ -203,9 +203,12 @@ public class KnowledgeBaseService {
      * source="youtrack"으로 필터링하여 knowledge base 데이터만 대상으로 검색.
      */
     public List<VectorSearchResult> searchKnowledgeBase(String query, int nResults) {
+        log.info("[KBSearch] YouTrack 검색: query='{}', nResults={}", query, nResults);
         float[] queryEmbedding = embeddingService.getEmbedding(query);
         Map<String, String> filter = Map.of("source", SOURCE_YOUTRACK);
-        return chromaDbClient.query(queryEmbedding, nResults, filter);
+        List<VectorSearchResult> results = chromaDbClient.query(queryEmbedding, nResults, filter);
+        logSearchResults("YouTrack", results);
+        return results;
     }
 
     // ========== Confluence 문서 처리 ==========
@@ -400,9 +403,12 @@ public class KnowledgeBaseService {
      * Confluence knowledge base에서 유사 문서를 검색한다.
      */
     public List<VectorSearchResult> searchConfluenceKnowledgeBase(String query, int nResults) {
+        log.info("[KBSearch] Confluence 검색: query='{}', nResults={}", query, nResults);
         float[] queryEmbedding = embeddingService.getEmbedding(query);
         Map<String, String> filter = Map.of("source", SOURCE_CONFLUENCE);
-        return chromaDbClient.query(queryEmbedding, nResults, filter);
+        List<VectorSearchResult> results = chromaDbClient.query(queryEmbedding, nResults, filter);
+        logSearchResults("Confluence", results);
+        return results;
     }
 
     /**
@@ -410,9 +416,12 @@ public class KnowledgeBaseService {
      * (YouTrack + Confluence 통합 검색)
      */
     public List<VectorSearchResult> searchAllKnowledgeBase(String query, int nResults) {
+        log.info("[KBSearch] 전체(YouTrack+Confluence) 검색: query='{}', nResults={}", query, nResults);
         float[] queryEmbedding = embeddingService.getEmbedding(query);
         // 필터 없이 전체 검색
-        return chromaDbClient.query(queryEmbedding, nResults, null);
+        List<VectorSearchResult> results = chromaDbClient.query(queryEmbedding, nResults, null);
+        logSearchResults("All", results);
+        return results;
     }
 
     /**
@@ -429,6 +438,26 @@ public class KnowledgeBaseService {
     public void deleteAllConfluenceData() {
         chromaDbClient.deleteByFilter(Map.of("source", SOURCE_CONFLUENCE));
         log.info("모든 Confluence knowledge base 데이터 삭제 완료");
+    }
+
+    private void logSearchResults(String searchType, List<VectorSearchResult> results) {
+        if (results.isEmpty()) {
+            log.info("[KBSearch] [{}] 결과 없음", searchType);
+            return;
+        }
+        log.info("[KBSearch] [{}] {}건 반환", searchType, results.size());
+        for (int i = 0; i < results.size(); i++) {
+            VectorSearchResult r = results.get(i);
+            String id = r.getMetadata() != null
+                    ? r.getMetadata().getOrDefault("issueId", r.getMetadata().getOrDefault("documentId", r.getId()))
+                    : r.getId();
+            String title = r.getMetadata() != null ? r.getMetadata().getOrDefault("title", "-") : "-";
+            String docSnippet = r.getDocument() != null
+                    ? r.getDocument().substring(0, Math.min(80, r.getDocument().length())).replace("\n", " ")
+                    : "";
+            log.info("[KBSearch] [{}] distance={} id={} title='{}' doc='{}'",
+                    i + 1, String.format("%.4f", r.getDistance()), id, title, docSnippet);
+        }
     }
 
     // ========== 디렉토리 기반 통합 Ingest (XLSX + HTML) ==========

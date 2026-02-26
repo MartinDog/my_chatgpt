@@ -127,6 +127,8 @@ public class ChromaDbClient {
             body.put("n_results", nResults);
             body.putArray("include").add("documents").add("metadatas").add("distances");
 
+            log.info("[ChromaDB] Query 시작: nResults={}, filter={}", nResults, whereFilter);
+
             if (whereFilter != null && !whereFilter.isEmpty()) {
                 ObjectNode where = body.putObject("where");
                 whereFilter.forEach(where::put);
@@ -165,10 +167,14 @@ public class ChromaDbClient {
                 }
             }
 
+            log.info("[ChromaDB] Query 완료: nResults={}, filter={} → {}건 반환, distances={}",
+                    nResults, whereFilter, results.size(),
+                    results.stream().map(r -> String.format("%.4f", r.getDistance())).toList());
+
             return results;
 
         } catch (Exception e) {
-            log.error("ChromaDB query failed", e);
+            log.error("[ChromaDB] Query 실패: nResults={}, filter={}", nResults, whereFilter, e);
             return new ArrayList<>();
         }
     }
