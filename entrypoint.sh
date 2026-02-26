@@ -135,9 +135,23 @@ done
 # Pull models if not already present
 OLLAMA_MODELS_LIST="${OLLAMA_EMBEDDING_MODEL:-bge-m3} ${OLLAMA_CHAT_MODEL:-qwen3:30b}"
 for model in $OLLAMA_MODELS_LIST; do
-    if ollama list 2>/dev/null | grep -q "^${model}"; then
-        echo "[entrypoint] Model already exists: ${model}, skipping pull"
-    else
+    if ! ollama list 2>/dev/null | grep -q "^${model}"; then
+        all_models_present=false
+        echo "[entrypoint] Model not found: ${model}"
+    fi
+done
+
+if [ "$all_models_present" = "true" ]; then
+    echo "[entrypoint] All required models already present, skipping pull"
+else
+    echo "[entrypoint] Some models missing — removing all existing models to free space..."
+    ollama list 2>/dev/null | awk 'NR>1 {print $1}' | while read -r existing_model; do
+        [ -z "$existing_model" ] && continue
+        echo "[entrypoint] Removing model: ${existing_model}"
+        ollama rm "$existing_model" 2>&1
+    done
+
+    for model in $OLLAMA_MODELS_LIST; do
         echo "[entrypoint] Pulling model: ${model} ... (this may take a while)"
         ollama pull "$model" 2>&1
         if [ $? -eq 0 ]; then
@@ -145,8 +159,8 @@ for model in $OLLAMA_MODELS_LIST; do
         else
             echo "[entrypoint] WARN: Failed to pull model: ${model}"
         fi
-    fi
-done
+    done
+fi
 
 # ---- 9. Start Spring Boot App ----
 echo "=========================================="

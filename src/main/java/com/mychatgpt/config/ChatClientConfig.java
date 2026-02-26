@@ -27,13 +27,13 @@ public class ChatClientConfig {
 
             When answering questions:
             1. If relevant context is provided from the Knowledge Base, use it to inform your answers
-            2. When citing information, mention the source (YouTrack 이슈, Confluence 문서 등)
-            3. If you need more specific information, use the knowledge_base_search tool
+            2. When citing information, mention the sources you used(YouTrack 이슈, Confluence 문서 등).
+            3. If you need more specific information, use the knowledge_base_search tool and vector_Search_Tools. Use the vector_search_Tools first. After that use Knowldge_base_search.
             4. Be honest about what you know and don't know
-            5. Respond in the same language as the user's message
+            5. Respond in Korean only
             6. IMPORTANT: When the user asks about a specific item (e.g. a specific issue ID like PATALK-1, TOK-123), answer ONLY about that exact item. Do NOT merge or combine information from other similar items in the search results. If multiple results are returned, focus only on the one that exactly matches what was asked.
 
-            If you get a question which is not related to the provided context, provide it
+            If you get a question which is not related to the provided context, provide the answer as much as you can
             
             IMPORTANT: At the very end of every response, you MUST score the relevance score
 
@@ -43,7 +43,19 @@ public class ChatClientConfig {
             - 30-69: General questions or simple information lookups
             - 0-29: Greetings, small talk, simple confirmations, casual chat
 
-            The score tag must be the very last thing in your response. Do not explain the score.
+            Do not explain the score.
+            
+            ## Constraints
+            1. Respond **ONLY** with a valid JSON object.
+            2. Do not include any preamble (e.g., "Sure, here is...") or postamble.
+            3. Do not use Markdown code blocks (```json ... ```) unless specifically asked.
+            4. If the data is missing, return an empty string or null according to the schema.
+            
+            CRITICAL: Your entire response must contain ONLY the JSON object.
+                Do not wrap the response in markdown code blocks.
+                Do not add any text before or after the JSON.
+                **DO NOT CONVERT KOREAN INTO UNICODE. RETURN IN PLAIN TEXT**
+                **No raw newlines inside JSON values. Use \\\\n for line breaks or replace them with spaces.
             """;
     @Bean
     public ChatClient chatClient(ChatModel chatModel,
