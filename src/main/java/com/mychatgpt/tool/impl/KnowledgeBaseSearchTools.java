@@ -16,7 +16,7 @@ import java.util.Map;
 @Slf4j
 public class KnowledgeBaseSearchTools {
 
-    private static final int DEFAULT_MAX_RESULTS = 5;
+    private static final int DEFAULT_MAX_RESULTS = 10;
     private static final double SIMILARITY_THRESHOLD = 0.2;
 
     private final VectorDbService vectorDbService;

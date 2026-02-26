@@ -65,7 +65,7 @@ public class ChatClientConfig {
                     ).build(),
                         QuestionAnswerAdvisor.builder(vectorStore)
                                 .searchRequest(SearchRequest.builder()
-                                        .topK(50)
+                                        .topK(10)
                                         .build())
                                 .build())
                 .build();

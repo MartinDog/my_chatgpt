@@ -31,4 +31,6 @@
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="FILE"/>
     </root>
+    <logger name="org.springframework.ai.vectorstore" level="DEBUG" />
+    <logger name="org.springframework.ai.chat.client.advisor" level="DEBUG" />
 </configuration>

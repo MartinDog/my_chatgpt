@@ -10,7 +10,6 @@ spring:
           model: ${OLLAMA_CHAT_MODEL:qwen3:30b}
           temperature: 0.3
           num-predict: 4096
-          top-p: 0.1
 
       embedding:
         options:
