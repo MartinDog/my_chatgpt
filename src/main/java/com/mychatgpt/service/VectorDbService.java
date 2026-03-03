@@ -86,6 +86,18 @@ public class VectorDbService {
     }
 
     /**
+     * 이슈 ID로 정확히 해당 이슈를 조회한다. (벡터 유사도 검색 없음)
+     * PATALK-123 같은 특정 이슈 ID를 물어볼 때 사용.
+     */
+    public List<VectorSearchResult> searchByIssueId(String issueId) {
+        log.info("[VectorSearch] 이슈 ID 정확 검색: issueId={}", issueId);
+        Map<String, String> filter = Map.of("issueId", issueId);
+        List<VectorSearchResult> results = chromaDbClient.getByMetadataFilter(filter, 1);
+        logSearchResults(results);
+        return results;
+    }
+
+    /**
      * Search the knowledge base (YouTrack + Confluence) for relevant context.
      * This searches documents stored via KnowledgeBaseService.
      *

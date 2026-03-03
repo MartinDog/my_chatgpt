@@ -6,11 +6,8 @@ import com.mychatgpt.tool.impl.KnowledgeBaseSearchTools;
 import com.mychatgpt.tool.impl.VectorSearchTools;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
-import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.vectorstore.SearchRequest;
-import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -59,12 +56,11 @@ public class ChatClientConfig {
             """;
     @Bean
     public ChatClient chatClient(ChatModel chatModel,
-                                  VectorStore vectorStore,
                                   CalculatorTools calculatorTools,
                                   CurrentTimeTools currentTimeTools,
                                   VectorSearchTools vectorSearchTools,
                                   KnowledgeBaseSearchTools knowledgeBaseSearchTools,
-                                  ChatMemory    chatMemory
+                                  ChatMemory chatMemory
     ) {
 
         return ChatClient.builder(chatModel)
@@ -72,14 +68,7 @@ public class ChatClientConfig {
                 .defaultTools(calculatorTools, currentTimeTools,
                               vectorSearchTools, knowledgeBaseSearchTools)
                 .defaultAdvisors(
-                    MessageChatMemoryAdvisor.builder(
-                        chatMemory
-                    ).build(),
-                        QuestionAnswerAdvisor.builder(vectorStore)
-                                .searchRequest(SearchRequest.builder()
-                                        .topK(10)
-                                        .build())
-                                .build())
+                    MessageChatMemoryAdvisor.builder(chatMemory).build())
                 .build();
     }
 }

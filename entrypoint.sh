@@ -8,8 +8,10 @@ echo "=========================================="
 
 # Helper: find java binary (java.real if wrapper is active, fallback to java)
 find_java() {
-    if [ -x "/opt/java/openjdk/bin/java.real" ]; then
-        echo "/opt/java/openjdk/bin/java.real"
+    local java_real
+    java_real=$(cat /app/.java_real_path 2>/dev/null)
+    if [ -n "$java_real" ] && [ -x "$java_real" ]; then
+        echo "$java_real"
     else
         echo "java"
     fi
@@ -114,57 +116,61 @@ for i in $(seq 1 60); do
     sleep 1
 done
 
-# ---- 8. Start Ollama ----
-echo "[entrypoint] Starting Ollama..."
-export OLLAMA_MODELS="/workspace/ollama"
-export OLLAMA_HOST="0.0.0.0:11434"
-ollama serve > /var/log/ollama.log 2>&1 &
+# ---- 8. Start vLLM ----
+VLLM_CHAT_INTERNAL_PORT="8100"
+VLLM_EMBED_INTERNAL_PORT="8101"
+VLLM_CHAT_MODEL_NAME="${VLLM_CHAT_MODEL:-Qwen/Qwen3-30B}"
+VLLM_EMBED_MODEL_NAME="${VLLM_EMBEDDING_MODEL:-BAAI/bge-m3}"
 
-echo "[entrypoint] Waiting for Ollama..."
-for i in $(seq 1 30); do
-    if curl -sf "http://localhost:11434/" >/dev/null 2>&1; then
-        echo "[entrypoint] Ollama is ready!"
+echo "[entrypoint] Starting vLLM chat: ${VLLM_CHAT_MODEL_NAME} on port ${VLLM_CHAT_INTERNAL_PORT}..."
+HF_HOME="/workspace/vllm" python3 -m vllm.entrypoints.openai.api_server \
+    --model "$VLLM_CHAT_MODEL_NAME" \
+    --host 0.0.0.0 \
+    --port "$VLLM_CHAT_INTERNAL_PORT" \
+    > /var/log/vllm-chat.log 2>&1 &
+
+echo "[entrypoint] Starting vLLM embed: ${VLLM_EMBED_MODEL_NAME} on port ${VLLM_EMBED_INTERNAL_PORT}..."
+HF_HOME="/workspace/vllm" python3 -m vllm.entrypoints.openai.api_server \
+    --model "$VLLM_EMBED_MODEL_NAME" \
+    --task embed \
+    --host 0.0.0.0 \
+    --port "$VLLM_EMBED_INTERNAL_PORT" \
+    > /var/log/vllm-embed.log 2>&1 &
+
+echo "[entrypoint] Waiting for vLLM chat (모델 로딩에 수 분 소요될 수 있음)..."
+for i in $(seq 1 300); do
+    if curl -sf "http://localhost:${VLLM_CHAT_INTERNAL_PORT}/health" >/dev/null 2>&1; then
+        echo "[entrypoint] vLLM chat is ready!"
         break
     fi
-    if [ "$i" -eq 30 ]; then
-        echo "[entrypoint] WARN: Ollama not ready after 30s, continuing anyway"
+    if [ "$i" -eq 300 ]; then
+        echo "[entrypoint] WARN: vLLM chat not ready after 300s, continuing anyway"
     fi
     sleep 1
 done
 
-# Pull models if not already present
-OLLAMA_MODELS_LIST="${OLLAMA_EMBEDDING_MODEL:-bge-m3} ${OLLAMA_CHAT_MODEL:-qwen3:30b}"
-for model in $OLLAMA_MODELS_LIST; do
-    if ! ollama list 2>/dev/null | grep -q "^${model}"; then
-        all_models_present=false
-        echo "[entrypoint] Model not found: ${model}"
+echo "[entrypoint] Waiting for vLLM embed..."
+for i in $(seq 1 300); do
+    if curl -sf "http://localhost:${VLLM_EMBED_INTERNAL_PORT}/health" >/dev/null 2>&1; then
+        echo "[entrypoint] vLLM embed is ready!"
+        break
     fi
+    if [ "$i" -eq 300 ]; then
+        echo "[entrypoint] WARN: vLLM embed not ready after 300s, continuing anyway"
+    fi
+    sleep 1
 done
 
-if [ "$all_models_present" = "true" ]; then
-    echo "[entrypoint] All required models already present, skipping pull"
-else
-    echo "[entrypoint] Some models missing — removing all existing models to free space..."
-    ollama list 2>/dev/null | awk 'NR>1 {print $1}' | while read -r existing_model; do
-        [ -z "$existing_model" ] && continue
-        echo "[entrypoint] Removing model: ${existing_model}"
-        ollama rm "$existing_model" 2>&1
-    done
-
-    for model in $OLLAMA_MODELS_LIST; do
-        echo "[entrypoint] Pulling model: ${model} ... (this may take a while)"
-        ollama pull "$model" 2>&1
-        if [ $? -eq 0 ]; then
-            echo "[entrypoint] Model pulled successfully: ${model}"
-        else
-            echo "[entrypoint] WARN: Failed to pull model: ${model}"
-        fi
-    done
-fi
+# Spring Boot app이 내부 vLLM에 연결하도록 강제 설정
+export VLLM_CHAT_HOST="localhost"
+export VLLM_CHAT_PORT="$VLLM_CHAT_INTERNAL_PORT"
+export VLLM_EMBED_HOST="localhost"
+export VLLM_EMBED_PORT="$VLLM_EMBED_INTERNAL_PORT"
 
 # ---- 9. Start Spring Boot App ----
 echo "=========================================="
 echo "[entrypoint] All services started. Launching Spring Boot..."
+echo "[entrypoint] vLLM chat  : localhost:${VLLM_CHAT_INTERNAL_PORT} (${VLLM_CHAT_MODEL_NAME})"
+echo "[entrypoint] vLLM embed : localhost:${VLLM_EMBED_INTERNAL_PORT} (${VLLM_EMBED_MODEL_NAME})"
 echo "=========================================="
-export OLLAMA_HOST="localhost"
 exec $(find_java) -jar /app/app.jar

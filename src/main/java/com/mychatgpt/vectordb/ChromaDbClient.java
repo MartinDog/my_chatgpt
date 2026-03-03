@@ -233,6 +233,63 @@ public class ChromaDbClient {
     }
 
     /**
+     * Get documents by metadata filter - 메타데이터 조건으로 문서를 정확히 조회한다.
+     * 벡터 유사도 검색 없이 메타데이터 필드 값으로 정확한 문서를 가져올 때 사용.
+     * 예: issueId="PATALK-123" 으로 정확히 해당 이슈만 조회.
+     */
+    public List<VectorSearchResult> getByMetadataFilter(Map<String, String> whereFilter, int limit) {
+        ensureReady();
+        try {
+            ObjectNode body = objectMapper.createObjectNode();
+            if (whereFilter != null && !whereFilter.isEmpty()) {
+                ObjectNode where = body.putObject("where");
+                whereFilter.forEach(where::put);
+            }
+            body.put("limit", limit);
+            body.putArray("include").add("documents").add("metadatas");
+
+            String responseStr = webClient.post()
+                    .uri(config.getBaseUrl() + "/api/v1/collections/" + collectionId + "/get")
+                    .header("Content-Type", "application/json")
+                    .bodyValue(body.toString())
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+
+            JsonNode response = objectMapper.readTree(responseStr);
+            List<VectorSearchResult> results = new ArrayList<>();
+
+            JsonNode idsNode = response.path("ids");
+            JsonNode docsNode = response.path("documents");
+            JsonNode metadatasNode = response.path("metadatas");
+
+            if (idsNode != null && idsNode.isArray()) {
+                for (int i = 0; i < idsNode.size(); i++) {
+                    VectorSearchResult result = new VectorSearchResult();
+                    result.setId(idsNode.get(i).asText());
+                    result.setDocument(docsNode.get(i).asText());
+                    result.setDistance(0.0); // 정확 매칭이므로 distance = 0
+                    if (metadatasNode.get(i) != null) {
+                        Map<String, String> meta = new java.util.HashMap<>();
+                        metadatasNode.get(i).fields().forEachRemaining(
+                                entry -> meta.put(entry.getKey(), entry.getValue().asText())
+                        );
+                        result.setMetadata(meta);
+                    }
+                    results.add(result);
+                }
+            }
+
+            log.info("[ChromaDB] Metadata filter 조회 완료: filter={} → {}건 반환", whereFilter, results.size());
+            return results;
+
+        } catch (Exception e) {
+            log.error("[ChromaDB] Metadata filter 조회 실패: filter={}", whereFilter, e);
+            return new ArrayList<>();
+        }
+    }
+
+    /**
      * Get documents by IDs - 특정 ID의 문서가 이미 존재하는지 확인할 때 사용.
      */
     public List<String> getExistingIds(List<String> ids) {

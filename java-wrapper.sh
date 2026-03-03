@@ -8,4 +8,5 @@ if [ ! -f /tmp/.services_started ]; then
     /app/entrypoint.sh
     exit $?
 fi
-exec /opt/java/openjdk/bin/java.real "$@"
+JAVA_REAL=$(cat /app/.java_real_path 2>/dev/null || echo "/opt/java/openjdk/bin/java.real")
+exec "$JAVA_REAL" "$@"

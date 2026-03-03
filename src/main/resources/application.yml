@@ -3,17 +3,19 @@ server:
 
 spring:
   ai:
-    ollama:
-      base-url: http://${OLLAMA_HOST:localhost}:${OLLAMA_PORT:11434}
+    # vLLM (OpenAI 호환 API) - chat + embedding
+    openai:
+      api-key: ${VLLM_API_KEY:none}
       chat:
+        base-url: http://${VLLM_CHAT_HOST:localhost}:${VLLM_CHAT_PORT:8000}/v1
         options:
-          model: ${OLLAMA_CHAT_MODEL:qwen3:30b}
+          model: ${VLLM_CHAT_MODEL:qwen3:30b}
           temperature: 0.3
-          num-predict: 4096
-
+          max-tokens: 4096
       embedding:
+        base-url: http://${VLLM_EMBED_HOST:localhost}:${VLLM_EMBED_PORT:8001}/v1
         options:
-          model: ${OLLAMA_EMBEDDING_MODEL:bge-m3}
+          model: ${VLLM_EMBEDDING_MODEL:bge-m3}
     vectorstore:
       chroma:
         client:

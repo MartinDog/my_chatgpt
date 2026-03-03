@@ -9,11 +9,13 @@ COPY src ./src
 RUN gradle bootJar --no-daemon -x test
 
 # --- Runtime Stage ---
-FROM eclipse-temurin:17-jre-jammy
+# CUDA 12.4 base for vLLM GPU support
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
 WORKDIR /app
 
-# Install PostgreSQL (with pgvector), ChromaDB, utilities
+# Install Java 17, PostgreSQL (with pgvector), ChromaDB, vLLM
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    openjdk-17-jre-headless \
     gnupg lsb-release curl ca-certificates \
     && echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
        > /etc/apt/sources.list.d/pgdg.list \
@@ -24,13 +26,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
     zstd \
-    && pip3 install --no-cache-dir "numpy<2.0" chromadb==0.6.3 \
+    && pip3 install --no-cache-dir "numpy<2.0" chromadb==0.6.3 vllm \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install Ollama
-RUN curl -fsSL https://ollama.com/install.sh | sh
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
-RUN mkdir -p /app/uploads /workspace/pgdata /workspace/chromadata /workspace/ollama \
+RUN mkdir -p /app/uploads /workspace/pgdata /workspace/chromadata /workspace/vllm \
     /var/run/postgresql /var/log \
     && chown postgres:postgres /workspace/pgdata /var/run/postgresql
 
@@ -41,9 +43,12 @@ RUN chmod +x /app/entrypoint.sh /app/java-wrapper.sh
 
 # RunPod overrides ENTRYPOINT and runs 'java -jar app.jar' directly.
 # Swap 'java' binary with our wrapper so entrypoint.sh always runs first.
-RUN mv /opt/java/openjdk/bin/java /opt/java/openjdk/bin/java.real \
-    && cp /app/java-wrapper.sh /opt/java/openjdk/bin/java \
-    && chmod +x /opt/java/openjdk/bin/java
+# Record the real java path so wrapper and entrypoint can find it dynamically.
+RUN JAVA_BIN=$(readlink -f $(which java)) \
+    && mv "$JAVA_BIN" "${JAVA_BIN}.real" \
+    && cp /app/java-wrapper.sh "$JAVA_BIN" \
+    && chmod +x "$JAVA_BIN" \
+    && echo "${JAVA_BIN}.real" > /app/.java_real_path
 
 EXPOSE 8080
 

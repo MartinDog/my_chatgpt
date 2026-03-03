@@ -35,15 +35,15 @@ services:
       timeout: 5s
       retries: 5
 
-  # 3. Ollama (GPU 가속 및 Qwen-30B 실행용)
-  ollama:
-    image: ollama/ollama:latest
-    container_name: mychatgpt-ollama
+  # 3. vLLM - Chat 모델
+  vllm-chat:
+    image: vllm/vllm-openai:latest
+    container_name: mychatgpt-vllm-chat
     ports:
-      - "11434:11434"
+      - "8100:8000"
     volumes:
-      - ./data/ollama:/root/.ollama
-    # NVIDIA GPU 사용을 위한 passthrough 설정
+      - ./data/vllm:/root/.cache/huggingface
+    command: ["--model", "${VLLM_CHAT_MODEL:-Qwen/Qwen3-30B}", "--host", "0.0.0.0", "--port", "8000"]
     deploy:
       resources:
         reservations:
@@ -52,7 +52,24 @@ services:
               count: all
               capabilities: [gpu]
 
-  # 4. Spring Boot App
+  # 4. vLLM - Embedding 모델
+  vllm-embed:
+    image: vllm/vllm-openai:latest
+    container_name: mychatgpt-vllm-embed
+    ports:
+      - "8101:8000"
+    volumes:
+      - ./data/vllm:/root/.cache/huggingface
+    command: ["--model", "${VLLM_EMBEDDING_MODEL:-BAAI/bge-m3}", "--host", "0.0.0.0", "--port", "8000", "--task", "embed"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # 5. Spring Boot App
   app:
     build:
       context: .
@@ -68,9 +85,12 @@ services:
       DB_PASSWORD: mychatgpt
       CHROMA_HOST: chromadb
       CHROMA_PORT: 8000
-      OLLAMA_HOST: ollama
-      OLLAMA_CHAT_MODEL: "qwen3:30b"
-      OLLAMA_EMBEDDING_MODEL: bge-m3
+      VLLM_CHAT_HOST: vllm-chat
+      VLLM_CHAT_PORT: 8000
+      VLLM_CHAT_MODEL: ${VLLM_CHAT_MODEL:-Qwen/Qwen3-30B}
+      VLLM_EMBED_HOST: vllm-embed
+      VLLM_EMBED_PORT: 8000
+      VLLM_EMBEDDING_MODEL: ${VLLM_EMBEDDING_MODEL:-BAAI/bge-m3}
     depends_on:
       postgres:
         condition: service_healthy

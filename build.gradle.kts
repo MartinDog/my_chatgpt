@@ -25,7 +25,7 @@ dependencyManagement {
 
 dependencies {
     // Spring AI
-    implementation("org.springframework.ai:spring-ai-starter-model-ollama")
+    implementation("org.springframework.ai:spring-ai-starter-model-openai")  // vLLM (OpenAI 호환 API) - chat + embedding
     implementation("org.springframework.ai:spring-ai-advisors-vector-store")
     implementation("org.springframework.ai:spring-ai-starter-vector-store-chroma")
 
