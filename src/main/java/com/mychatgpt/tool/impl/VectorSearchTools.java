@@ -16,6 +16,7 @@ import java.util.List;
 public class VectorSearchTools {
 
     private static final int DEFAULT_MAX_RESULTS = 5;
+    private static final int MAX_DOC_DISPLAY_CHARS = 1000;
 
     private final VectorDbService vectorDbService;
 
@@ -42,7 +43,7 @@ public class VectorSearchTools {
             for (int i = 0; i < results.size(); i++) {
                 VectorSearchResult result = results.get(i);
                 sb.append("--- 결과 ").append(i + 1).append(" ---\n");
-                sb.append("내용: ").append(result.getDocument()).append("\n");
+                sb.append("내용: ").append(truncateDocument(result.getDocument())).append("\n");
                 if (result.getMetadata() != null) {
                     String source = result.getMetadata().get("source");
                     if (source != null) {
@@ -57,5 +58,11 @@ public class VectorSearchTools {
             log.error("Vector search error", e);
             return "검색 중 오류가 발생했습니다: " + e.getMessage();
         }
+    }
+
+    private String truncateDocument(String doc) {
+        if (doc == null) return "";
+        if (doc.length() <= MAX_DOC_DISPLAY_CHARS) return doc;
+        return doc.substring(0, MAX_DOC_DISPLAY_CHARS) + "...(이하 생략)";
     }
 }

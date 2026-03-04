@@ -5,6 +5,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Confluence에서 export된 HTML 문서 한 건을 표현하는 DTO.
  *
@@ -47,20 +50,33 @@ public class ConfluenceDocumentDto {
      * - 본문은 이미 HTML에서 텍스트만 추출된 상태
      * - 제목과 breadcrumb을 함께 포함해 "API 문서" 검색 시 관련 문서를 쉽게 찾도록 함
      */
-    public String toVectorDocument() {
-        StringBuilder sb = new StringBuilder();
+    private static final int CHUNK_SIZE = 1000;
+    private static final int CHUNK_OVERLAP = 200;
 
-        sb.append("[문서 ID] ").append(id).append("\n");
-        sb.append("[제목] ").append(title).append("\n");
+    public List<String> toVectorChunks() {
+        StringBuilder headerSb = new StringBuilder();
+        headerSb.append("[문서 ID] ").append(id).append("\n");
+        headerSb.append("[제목] ").append(title).append("\n");
+        if (breadcrumb != null && !breadcrumb.isBlank())
+            headerSb.append("[경로] ").append(breadcrumb).append("\n");
+        String header = headerSb.toString();
 
-        if (breadcrumb != null && !breadcrumb.isBlank()) {
-            sb.append("[경로] ").append(breadcrumb).append("\n");
+        String fullContent = (content != null && !content.isBlank())
+                ? "[내용]\n" + content.strip() + "\n"
+                : "";
+
+        int effectiveSize = CHUNK_SIZE - header.length();
+
+        if (fullContent.length() <= effectiveSize)
+            return List.of(header + fullContent);
+
+        List<String> chunks = new ArrayList<>();
+        int start = 0;
+        while (start < fullContent.length()) {
+            int end = Math.min(start + effectiveSize, fullContent.length());
+            chunks.add(header + fullContent.substring(start, end));
+            start += effectiveSize - CHUNK_OVERLAP;
         }
-
-        if (content != null && !content.isBlank()) {
-            sb.append("[내용]\n").append(content.strip()).append("\n");
-        }
-
-        return sb.toString();
+        return chunks;
     }
 }

@@ -13,6 +13,8 @@ RUN gradle bootJar --no-daemon -x test
 FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
 WORKDIR /app
 
+ENV DEBIAN_FRONTEND=noninteractive
+
 # Install Java 17, PostgreSQL (with pgvector), ChromaDB, vLLM
 RUN apt-get update && apt-get install -y --no-install-recommends \
     openjdk-17-jre-headless \

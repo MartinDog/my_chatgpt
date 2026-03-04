@@ -5,6 +5,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * YouTrack에서 export된 이슈 한 건을 표현하는 DTO.
  *
@@ -59,20 +62,31 @@ public class YouTrackIssueDto {
      *   어디부터가 처리 결과인지 구별 가능
      * - 비정형 텍스트보다 정형화된 구조가 임베딩 품질과 검색 정확도를 높임
      */
-    public String toVectorDocument() {
-        StringBuilder sb = new StringBuilder();
+    private static final int CHUNK_SIZE = 1000;
+    private static final int CHUNK_OVERLAP = 200;
 
-        sb.append("[이슈 ID] ").append(id).append("\n");
-        sb.append("[제목] ").append(title).append("\n");
+    public List<String> toVectorChunks() {
+        String header = "[이슈 ID] " + id + "\n[제목] " + title + "\n";
 
-        if (body != null && !body.isBlank()) {
-            sb.append("[본문]\n").append(body.strip()).append("\n");
+        StringBuilder body = new StringBuilder();
+        if (this.body != null && !this.body.isBlank())
+            body.append("[본문]\n").append(this.body.strip()).append("\n");
+        if (comments != null && !comments.isBlank())
+            body.append("[댓글]\n").append(comments.strip()).append("\n");
+
+        String fullContent = body.toString();
+        int effectiveSize = CHUNK_SIZE - header.length();
+
+        if (fullContent.length() <= effectiveSize)
+            return List.of(header + fullContent);
+
+        List<String> chunks = new ArrayList<>();
+        int start = 0;
+        while (start < fullContent.length()) {
+            int end = Math.min(start + effectiveSize, fullContent.length());
+            chunks.add(header + fullContent.substring(start, end));
+            start += effectiveSize - CHUNK_OVERLAP;
         }
-
-        if (comments != null && !comments.isBlank()) {
-            sb.append("[댓글]\n").append(comments.strip()).append("\n");
-        }
-
-        return sb.toString();
+        return chunks;
     }
 }

@@ -1,5 +1,6 @@
 package com.mychatgpt.tool.impl;
 
+import com.mychatgpt.service.RerankService;
 import com.mychatgpt.service.VectorDbService;
 import com.mychatgpt.vectordb.VectorSearchResult;
 import lombok.RequiredArgsConstructor;
@@ -19,12 +20,14 @@ import java.util.regex.Pattern;
 public class KnowledgeBaseSearchTools {
 
     private static final int DEFAULT_MAX_RESULTS = 10;
-    private static final double SIMILARITY_THRESHOLD = 0.5;
+    private static final double SIMILARITY_THRESHOLD = 0.65;
+    private static final int MAX_DOC_DISPLAY_CHARS = 1000;
 
     /** YouTrack 이슈 ID 패턴: 대문자 프로젝트코드 + 하이픈 + 숫자 (예: PATALK-123, TOK-45) */
     private static final Pattern ISSUE_ID_PATTERN = Pattern.compile("[A-Z]+-\\d+");
 
     private final VectorDbService vectorDbService;
+    private final RerankService rerankService;
 
     @Tool(description = "회사의 Knowledge Base (YouTrack 이슈, Confluence 문서)에서 관련 정보를 검색합니다. 업무 관련 질문, 기능 문의, 과거 이슈 조회, 문서 검색 등에 사용하세요.")
     public String knowledgeBaseSearch(
@@ -71,6 +74,8 @@ public class KnowledgeBaseSearchTools {
                 return "검색 결과가 없습니다. Knowledge Base에 관련 정보가 없습니다.";
             }
 
+            results = rerankService.rerank(query, results);
+
             return formatResults(results);
         } catch (Exception e) {
             log.error("Knowledge Base 검색 오류", e);
@@ -113,11 +118,17 @@ public class KnowledgeBaseSearchTools {
                 }
             }
 
-            sb.append("내용:\n").append(result.getDocument()).append("\n");
+            sb.append("내용:\n").append(truncateDocument(result.getDocument())).append("\n");
             double similarity = result.getDistance() == 0.0 ? 1.0 : (1.0 - result.getDistance());
             sb.append("관련도 점수: ").append(String.format("%.4f", similarity)).append("\n\n");
         }
 
         return sb.toString();
+    }
+
+    private String truncateDocument(String doc) {
+        if (doc == null) return "";
+        if (doc.length() <= MAX_DOC_DISPLAY_CHARS) return doc;
+        return doc.substring(0, MAX_DOC_DISPLAY_CHARS) + "...(이하 생략)";
     }
 }

@@ -108,25 +108,33 @@ public class KnowledgeBaseService {
      * API를 통한 개별 이슈 업데이트 시 사용.
      */
     public void upsertSingleIssue(YouTrackIssueDto issue) {
-        String document = issue.toVectorDocument();
-        float[] embedding = embeddingService.getEmbedding(document);
-        Map<String, String> metadata = buildMetadata(issue);
+        // 기존 청크 삭제 (재업로드 시 orphan 방지)
+        try {
+            chromaDbClient.deleteByFilter(Map.of("issueId", issue.getId()));
+        } catch (Exception e) {
+            log.warn("기존 청크 삭제 실패 (무시): {} - {}", issue.getId(), e.getMessage());
+        }
 
-        chromaDbClient.upsertDocuments(
-                List.of(issue.getId()),
-                List.of(embedding),
-                List.of(document),
-                List.of(metadata)
-        );
+        List<String> chunks = issue.toVectorChunks();
+        List<String> ids = new ArrayList<>();
+        List<float[]> embeddings = new ArrayList<>();
+        List<String> documents = new ArrayList<>();
+        List<Map<String, String>> metadatas = new ArrayList<>();
 
-        log.info("이슈 upsert 완료: {}", issue.getId());
+        for (int i = 0; i < chunks.size(); i++) {
+            String chunk = chunks.get(i);
+            ids.add(issue.getId() + "-" + i);
+            embeddings.add(embeddingService.getEmbedding(chunk));
+            documents.add(chunk);
+            metadatas.add(buildChunkMetadata(issue, i, chunks.size()));
+        }
+
+        chromaDbClient.addDocuments(ids, embeddings, documents, metadatas);
+        log.info("이슈 upsert 완료: {} ({}개 청크)", issue.getId(), chunks.size());
     }
 
     /**
      * 배치 단위로 이슈를 벡터DB에 upsert한다.
-     *
-     * 임베딩 생성은 건별로 호출해야 하므로 (OpenAI embedding API는 단일 입력),
-     * 임베딩은 루프로 생성하되 ChromaDB upsert는 배치로 한 번에 호출한다.
      */
     private void upsertBatch(List<YouTrackIssueDto> batch) {
         List<String> ids = new ArrayList<>();
@@ -135,24 +143,30 @@ public class KnowledgeBaseService {
         List<Map<String, String>> metadatas = new ArrayList<>();
 
         for (YouTrackIssueDto issue : batch) {
-            String document = issue.toVectorDocument();
+            // 기존 청크 삭제 (재업로드 시 orphan 방지)
+            try {
+                chromaDbClient.deleteByFilter(Map.of("issueId", issue.getId()));
+            } catch (Exception e) {
+                log.warn("기존 청크 삭제 실패 (무시): {} - {}", issue.getId(), e.getMessage());
+            }
 
-            // 빈 문서는 건너뜀 (ID와 제목만 있는 경우에도 최소한의 텍스트가 있으므로 대부분 통과)
-            if (document.isBlank()) {
-                log.warn("빈 문서 건너뜀: {}", issue.getId());
+            List<String> chunks = issue.toVectorChunks();
+            if (chunks.isEmpty()) {
+                log.warn("빈 청크 건너뜀: {}", issue.getId());
                 continue;
             }
 
-            float[] embedding = embeddingService.getEmbedding(document);
-
-            ids.add(issue.getId());
-            embeddings.add(embedding);
-            documents.add(document);
-            metadatas.add(buildMetadata(issue));
+            for (int i = 0; i < chunks.size(); i++) {
+                String chunk = chunks.get(i);
+                ids.add(issue.getId() + "-" + i);
+                embeddings.add(embeddingService.getEmbedding(chunk));
+                documents.add(chunk);
+                metadatas.add(buildChunkMetadata(issue, i, chunks.size()));
+            }
         }
 
         if (!ids.isEmpty()) {
-            chromaDbClient.upsertDocuments(ids, embeddings, documents, metadatas);
+            chromaDbClient.addDocuments(ids, embeddings, documents, metadatas);
         }
     }
 
@@ -168,7 +182,7 @@ public class KnowledgeBaseService {
      * - ChromaDB metadata는 null 값을 허용하지 않음
      * - null이 들어가면 전체 upsert가 실패할 수 있음
      */
-    private Map<String, String> buildMetadata(YouTrackIssueDto issue) {
+    private Map<String, String> buildChunkMetadata(YouTrackIssueDto issue, int chunkIndex, int totalChunks) {
         Map<String, String> metadata = new LinkedHashMap<>();
         metadata.put("source", SOURCE_YOUTRACK);
         metadata.put("issueId", issue.getId());
@@ -178,14 +192,17 @@ public class KnowledgeBaseService {
         metadata.put("requester", Objects.toString(issue.getRequester(), ""));
         metadata.put("assignee", Objects.toString(issue.getAssignee(), ""));
         metadata.put("createdDate", Objects.toString(issue.getCreatedDate(), ""));
+        metadata.put("chunkIndex", String.valueOf(chunkIndex));
+        metadata.put("totalChunks", String.valueOf(totalChunks));
         return metadata;
     }
 
     /**
      * 특정 ID의 knowledge base 이슈를 삭제한다.
+     * 청킹으로 인해 여러 청크가 존재할 수 있으므로 issueId 메타데이터로 필터 삭제.
      */
     public void deleteIssue(String issueId) {
-        chromaDbClient.deleteByIds(List.of(issueId));
+        chromaDbClient.deleteByFilter(Map.of("issueId", issueId));
         log.info("Knowledge base 이슈 삭제: {}", issueId);
     }
 
@@ -340,18 +357,29 @@ public class KnowledgeBaseService {
      * 단일 Confluence 문서를 벡터DB에 upsert한다.
      */
     public void upsertSingleConfluenceDocument(ConfluenceDocumentDto document) {
-        String docText = document.toVectorDocument();
-        float[] embedding = embeddingService.getEmbedding(docText);
-        Map<String, String> metadata = buildConfluenceMetadata(document);
+        // 기존 청크 삭제 (재업로드 시 orphan 방지)
+        try {
+            chromaDbClient.deleteByFilter(Map.of("documentId", document.getId()));
+        } catch (Exception e) {
+            log.warn("기존 청크 삭제 실패 (무시): {} - {}", document.getId(), e.getMessage());
+        }
 
-        chromaDbClient.upsertDocuments(
-                List.of(document.getId()),
-                List.of(embedding),
-                List.of(docText),
-                List.of(metadata)
-        );
+        List<String> chunks = document.toVectorChunks();
+        List<String> ids = new ArrayList<>();
+        List<float[]> embeddings = new ArrayList<>();
+        List<String> documents = new ArrayList<>();
+        List<Map<String, String>> metadatas = new ArrayList<>();
 
-        log.info("Confluence 문서 upsert 완료: {}", document.getId());
+        for (int i = 0; i < chunks.size(); i++) {
+            String chunk = chunks.get(i);
+            ids.add(document.getId() + "-" + i);
+            embeddings.add(embeddingService.getEmbedding(chunk));
+            documents.add(chunk);
+            metadatas.add(buildConfluenceChunkMetadata(document, i, chunks.size()));
+        }
+
+        chromaDbClient.addDocuments(ids, embeddings, documents, metadatas);
+        log.info("Confluence 문서 upsert 완료: {} ({}개 청크)", document.getId(), chunks.size());
     }
 
     /**
@@ -364,30 +392,37 @@ public class KnowledgeBaseService {
         List<Map<String, String>> metadatas = new ArrayList<>();
 
         for (ConfluenceDocumentDto doc : batch) {
-            String docText = doc.toVectorDocument();
+            // 기존 청크 삭제 (재업로드 시 orphan 방지)
+            try {
+                chromaDbClient.deleteByFilter(Map.of("documentId", doc.getId()));
+            } catch (Exception e) {
+                log.warn("기존 청크 삭제 실패 (무시): {} - {}", doc.getId(), e.getMessage());
+            }
 
-            if (docText.isBlank()) {
+            List<String> chunks = doc.toVectorChunks();
+            if (chunks.isEmpty()) {
                 log.warn("빈 문서 건너뜀: {}", doc.getId());
                 continue;
             }
 
-            float[] embedding = embeddingService.getEmbedding(docText);
-
-            ids.add(doc.getId());
-            embeddings.add(embedding);
-            documents.add(docText);
-            metadatas.add(buildConfluenceMetadata(doc));
+            for (int i = 0; i < chunks.size(); i++) {
+                String chunk = chunks.get(i);
+                ids.add(doc.getId() + "-" + i);
+                embeddings.add(embeddingService.getEmbedding(chunk));
+                documents.add(chunk);
+                metadatas.add(buildConfluenceChunkMetadata(doc, i, chunks.size()));
+            }
         }
 
         if (!ids.isEmpty()) {
-            chromaDbClient.upsertDocuments(ids, embeddings, documents, metadatas);
+            chromaDbClient.addDocuments(ids, embeddings, documents, metadatas);
         }
     }
 
     /**
      * Confluence 문서의 메타데이터를 구성한다.
      */
-    private Map<String, String> buildConfluenceMetadata(ConfluenceDocumentDto doc) {
+    private Map<String, String> buildConfluenceChunkMetadata(ConfluenceDocumentDto doc, int chunkIndex, int totalChunks) {
         Map<String, String> metadata = new LinkedHashMap<>();
         metadata.put("source", SOURCE_CONFLUENCE);
         metadata.put("documentId", doc.getId());
@@ -396,6 +431,8 @@ public class KnowledgeBaseService {
         metadata.put("author", Objects.toString(doc.getAuthor(), ""));
         metadata.put("lastModified", Objects.toString(doc.getLastModified(), ""));
         metadata.put("fileName", Objects.toString(doc.getFileName(), ""));
+        metadata.put("chunkIndex", String.valueOf(chunkIndex));
+        metadata.put("totalChunks", String.valueOf(totalChunks));
         return metadata;
     }
 
@@ -426,9 +463,10 @@ public class KnowledgeBaseService {
 
     /**
      * 특정 ID의 Confluence 문서를 삭제한다.
+     * 청킹으로 인해 여러 청크가 존재할 수 있으므로 documentId 메타데이터로 필터 삭제.
      */
     public void deleteConfluenceDocument(String documentId) {
-        chromaDbClient.deleteByIds(List.of(documentId));
+        chromaDbClient.deleteByFilter(Map.of("documentId", documentId));
         log.info("Confluence 문서 삭제: {}", documentId);
     }
 

@@ -92,7 +92,7 @@ public class VectorDbService {
     public List<VectorSearchResult> searchByIssueId(String issueId) {
         log.info("[VectorSearch] 이슈 ID 정확 검색: issueId={}", issueId);
         Map<String, String> filter = Map.of("issueId", issueId);
-        List<VectorSearchResult> results = chromaDbClient.getByMetadataFilter(filter, 1);
+        List<VectorSearchResult> results = chromaDbClient.getByMetadataFilter(filter, 10);
         logSearchResults(results);
         return results;
     }
